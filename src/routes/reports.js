@@ -44,42 +44,32 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowed hostnames
-const http = require('http');
+// FIX: Server-Side Request Forgery (CWE-918) - use allowlisted URLs only
 const https = require('https');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.medsecure.example.com',
-  'data.medsecure.example.com',
-  'reports.medsecure.example.com',
-];
+// Map of allowed source keys to their full URLs. No user input is used in the request URL.
+const ALLOWED_EXTERNAL_URLS = {
+  'patient-records': 'https://api.medsecure.example.com/patient-records',
+  'lab-results': 'https://data.medsecure.example.com/lab-results',
+  'billing-summary': 'https://reports.medsecure.example.com/billing-summary',
+};
 
 router.get('/fetch-external', (req, res) => {
-  const rawUrl = req.query.url;
+  const source = req.query.source;
 
-  if (!rawUrl || typeof rawUrl !== 'string') {
-    return res.status(400).json({ error: 'Missing or invalid url parameter' });
+  if (!source || typeof source !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid source parameter' });
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(rawUrl);
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid URL format' });
+  // Look up the fully-qualified URL from the allowlist; user input selects a key, not a URL
+  const targetUrl = ALLOWED_EXTERNAL_URLS[source];
+  if (!targetUrl) {
+    return res.status(403).json({
+      error: 'Unknown source. Allowed sources: ' + Object.keys(ALLOWED_EXTERNAL_URLS).join(', ')
+    });
   }
 
-  // Only allow http and https protocols
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http and https protocols are allowed' });
-  }
-
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
-    return res.status(403).json({ error: 'Requested host is not in the allowed list' });
-  }
-
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl.href, (response) => {
+  https.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

@@ -33,13 +33,14 @@ router.get('/download', (req, res) => {
 // FIX: Path traversal (CWE-22) - normalize path and verify it stays within the reports root
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  const REPORTS_ROOT = path.resolve('/reports');
-  const resolvedPath = path.resolve(REPORTS_ROOT, path.basename(reportPath));
-  if (!resolvedPath.startsWith(REPORTS_ROOT + '/')) {
-    return res.status(400).json({ error: 'Invalid file path' });
+  const root = path.resolve('/reports');
+  const filePath = path.resolve(root, reportPath);
+  if (filePath.startsWith(root)) {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    res.json({ content });
+  } else {
+    res.status(400).json({ error: 'Invalid file path' });
   }
-  const content = fs.readFileSync(resolvedPath, 'utf-8');
-  res.json({ content });
 });
 
 // VULN: Command injection via filename (CWE-78)

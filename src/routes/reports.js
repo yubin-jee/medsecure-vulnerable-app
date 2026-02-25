@@ -11,10 +11,11 @@ const ALLOWED_REPORT_TYPES = ['summary', 'detailed', 'audit', 'compliance', 'pat
 const ALLOWED_FORMATS = ['pdf', 'csv', 'json', 'xml', 'html'];
 
 // Extract a sanitized filename containing only safe characters (alphanumeric, hyphens, underscores, dots)
+// Must start with an alphanumeric character to prevent argument injection via leading hyphens (CWE-88)
 // Returns the sanitized string or null if the value is invalid
 function sanitizeFilename(value) {
   if (typeof value !== 'string') return null;
-  const match = value.match(/^[a-zA-Z0-9._-]+$/);
+  const match = value.match(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/);
   return match ? match[0] : null;
 }
 
@@ -42,7 +43,7 @@ router.post('/export', (req, res) => {
   }
   // Use sanitized/allowlisted values to avoid passing tainted data to the command
   const safeFormat = ALLOWED_FORMATS[formatIndex];
-  execFile('convert-data', [safeFilename, '--output-format', safeFormat], (err, stdout) => {
+  execFile('convert-data', ['--', safeFilename, '--output-format', safeFormat], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -78,7 +79,7 @@ router.post('/compress', (req, res) => {
     }
     safeFiles.push(safe);
   }
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...safeFiles]);
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', '--', ...safeFiles]);
   res.download('/tmp/archive.tar.gz');
 });
 

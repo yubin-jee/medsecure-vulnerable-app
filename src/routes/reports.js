@@ -30,11 +30,13 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - sanitize path with path.basename to strip directory components
+// FIX: Path traversal (CWE-22) - allowlist validation to prevent directory traversal
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  const sanitizedPath = path.basename(reportPath);
-  const resolvedPath = path.join('/reports', sanitizedPath);
+  if (typeof reportPath !== 'string' || !reportPath.match(/^[\w][\w.\-]*$/)) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
+  const resolvedPath = path.join('/reports', reportPath);
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });

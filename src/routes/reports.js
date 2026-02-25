@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { execSync, exec } = require('child_process');
+const { execSync, execFileSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -36,11 +36,25 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-// VULN: Command injection via filename (CWE-78)
+// FIX: Command injection via filename (CWE-78) - use execFileSync with argument array
 router.post('/compress', (req, res) => {
   const { files } = req.body;
-  const fileList = files.join(' ');
-  execSync(`tar -czf /tmp/archive.tar.gz ${fileList}`);
+
+  // Validate that files is a non-empty array of strings
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: 'files must be a non-empty array' });
+  }
+
+  // Reject filenames containing path traversal or shell metacharacters
+  const safePattern = /^[\w.\-\/]+$/;
+  for (const file of files) {
+    if (typeof file !== 'string' || !safePattern.test(file)) {
+      return res.status(400).json({ error: 'Invalid filename: ' + String(file) });
+    }
+  }
+
+  // Use execFileSync to avoid shell interpretation of filenames
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
   res.download('/tmp/archive.tar.gz');
 });
 

@@ -3,9 +3,19 @@ const router = express.Router();
 const { execFileSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiter for resource-intensive report endpoints
+const reportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 // FIXED: Command injection (CWE-78) - use execFileSync with argument array
-router.get('/generate', (req, res) => {
+router.get('/generate', reportLimiter, (req, res) => {
   const reportType = req.query.type;
   if (!reportType || /[^a-zA-Z0-9_-]/.test(reportType)) {
     return res.status(400).json({ error: 'Invalid report type' });
@@ -15,7 +25,7 @@ router.get('/generate', (req, res) => {
 });
 
 // FIXED: Command injection (CWE-78) - use execFile with argument array
-router.post('/export', (req, res) => {
+router.post('/export', reportLimiter, (req, res) => {
   const { filename, format } = req.body;
   if (!filename || !format) {
     return res.status(400).json({ error: 'Missing filename or format' });
@@ -46,7 +56,7 @@ router.get('/view', (req, res) => {
 });
 
 // FIXED: Command injection via filename (CWE-78) - use execFileSync with argument array
-router.post('/compress', (req, res) => {
+router.post('/compress', reportLimiter, (req, res) => {
   const { files } = req.body;
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'Invalid files list' });

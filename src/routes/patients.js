@@ -1,8 +1,21 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const db = require('../utils/database');
 
+// Rate limiter for patient routes to prevent abuse (CWE-770)
+const patientRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+router.use(patientRateLimiter);
+
 // FIX: SQL Injection (CWE-89) - use parameterized query instead of concatenation
+// Rate limiting applied via router.use(patientRateLimiter) above
 router.get('/search', (req, res) => {
   const name = req.query.name;
   const query = "SELECT * FROM patients WHERE name LIKE ?";

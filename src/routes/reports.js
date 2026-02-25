@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { execSync, execFileSync, exec } = require('child_process');
+const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const archiver = require('archiver');
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -36,7 +37,7 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-// FIX: Command injection via filename (CWE-78) - use execFileSync with argument array
+// FIX: Command injection via filename (CWE-78) - use archiver library instead of shell commands
 router.post('/compress', (req, res) => {
   const { files } = req.body;
 
@@ -46,16 +47,34 @@ router.post('/compress', (req, res) => {
   }
 
   // Reject filenames containing path traversal or shell metacharacters
-  const safePattern = /^[\w.\-\/]+$/;
+  const safePattern = /^[\w.\-]+$/;
   for (const file of files) {
     if (typeof file !== 'string' || !safePattern.test(file)) {
-      return res.status(400).json({ error: 'Invalid filename: ' + String(file) });
+      return res.status(400).json({ error: 'Invalid filename' });
     }
   }
 
-  // Use execFileSync to avoid shell interpretation of filenames
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
-  res.download('/tmp/archive.tar.gz');
+  // Use archiver library to create tar.gz — no shell command execution at all
+  const outputPath = '/tmp/archive.tar.gz';
+  const output = fs.createWriteStream(outputPath);
+  const archive = archiver('tar', { gzip: true });
+
+  output.on('close', () => {
+    res.download(outputPath);
+  });
+
+  archive.on('error', (err) => {
+    res.status(500).json({ error: 'Failed to create archive' });
+  });
+
+  archive.pipe(output);
+
+  for (const file of files) {
+    const filePath = path.join('/reports', file);
+    archive.file(filePath, { name: file });
+  }
+
+  archive.finalize();
 });
 
 // FIX: Server-Side Request Forgery (CWE-918) - use allowlisted resource map

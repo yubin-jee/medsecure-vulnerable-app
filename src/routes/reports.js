@@ -3,6 +3,16 @@ const router = express.Router();
 const { execFileSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiter for resource-intensive report endpoints
+const reportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 // Allowlist of valid report types
 const ALLOWED_REPORT_TYPES = ['summary', 'detailed', 'audit', 'compliance', 'patient', 'billing'];
@@ -19,7 +29,7 @@ function sanitizeFilename(value) {
   return match ? match[0] : null;
 }
 
-router.get('/generate', (req, res) => {
+router.get('/generate', reportLimiter, (req, res) => {
   const reportType = req.query.type;
   const typeIndex = ALLOWED_REPORT_TYPES.indexOf(reportType);
   if (typeIndex === -1) {
@@ -31,7 +41,7 @@ router.get('/generate', (req, res) => {
   res.send(output);
 });
 
-router.post('/export', (req, res) => {
+router.post('/export', reportLimiter, (req, res) => {
   const { filename, format } = req.body;
   const safeFilename = sanitizeFilename(filename);
   if (!safeFilename) {
@@ -65,7 +75,7 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-router.post('/compress', (req, res) => {
+router.post('/compress', reportLimiter, (req, res) => {
   const { files } = req.body;
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'Files must be a non-empty array' });

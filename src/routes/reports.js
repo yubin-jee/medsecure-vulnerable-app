@@ -3,6 +3,7 @@ const router = express.Router();
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const sanitize = require('sanitize-filename');
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -22,36 +23,30 @@ router.post('/export', (req, res) => {
   });
 });
 
-// FIX: Path traversal (CWE-22) - reject traversal sequences and absolute paths
+// FIX: Path traversal (CWE-22) - sanitize filename to prevent directory traversal
 router.get('/download', (req, res) => {
   const filename = req.query.file;
   if (!filename || typeof filename !== 'string') {
     return res.status(400).json({ error: 'Missing file parameter' });
   }
-  if (filename.includes('..')) {
-    return res.status(403).json({ error: 'Access denied' });
+  const safeName = sanitize(filename);
+  if (!safeName) {
+    return res.status(400).json({ error: 'Invalid file parameter' });
   }
-  if (path.isAbsolute(filename)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  const safeName = path.basename(filename);
   const filePath = path.join('/reports', safeName);
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - reject traversal sequences and absolute paths
+// FIX: Path traversal (CWE-22) - sanitize filename to prevent directory traversal
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
   if (!reportPath || typeof reportPath !== 'string') {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
-  if (reportPath.includes('..')) {
-    return res.status(403).json({ error: 'Access denied' });
+  const safeName = sanitize(reportPath);
+  if (!safeName) {
+    return res.status(400).json({ error: 'Invalid path parameter' });
   }
-  if (path.isAbsolute(reportPath)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  const safeName = path.basename(reportPath);
   const safePath = path.join('/reports', safeName);
   const content = fs.readFileSync(safePath, 'utf-8');
   res.json({ content });

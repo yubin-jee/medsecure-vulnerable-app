@@ -30,11 +30,14 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - sanitize path with path.basename to strip directory components
+// FIX: Path traversal (CWE-22) - normalize path and verify it stays within the reports root
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  const safeName = path.basename(reportPath);
-  const resolvedPath = path.join('/reports', safeName);
+  const REPORTS_ROOT = path.resolve('/reports');
+  const resolvedPath = path.resolve(REPORTS_ROOT, path.basename(reportPath));
+  if (!resolvedPath.startsWith(REPORTS_ROOT + '/')) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });

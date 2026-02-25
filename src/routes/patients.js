@@ -45,20 +45,21 @@ router.delete('/:id', (req, res) => {
   res.json({ message: 'Patient deleted' });
 });
 
-// FIXED: SQL Injection (CWE-89) - use parameterized queries in bulk update
-// Column names are sourced from this constant array (never from user input)
-const ALLOWED_COLUMNS = ['name', 'dob', 'ssn', 'diagnosis'];
+// FIXED: SQL Injection (CWE-89) - fully static parameterized query for bulk update
+// COALESCE keeps existing value when parameter is null (column not being updated)
+const BULK_UPDATE_QUERY = "UPDATE patients SET name = COALESCE(?, name), dob = COALESCE(?, dob), ssn = COALESCE(?, ssn), diagnosis = COALESCE(?, diagnosis) WHERE id = ?";
 
 router.post('/bulk-update', (req, res) => {
   const updates = req.body;
+  const stmt = db.prepare(BULK_UPDATE_QUERY);
   updates.forEach(update => {
-    // Only include columns from the hardcoded allowlist that exist in the update
-    const columnsToUpdate = ALLOWED_COLUMNS.filter(col => Object.prototype.hasOwnProperty.call(update, col));
-    if (columnsToUpdate.length === 0) return;
-    const setClauses = columnsToUpdate.map(col => `${col} = ?`).join(', ');
-    const values = columnsToUpdate.map(col => update[col]);
-    values.push(update.id);
-    db.prepare(`UPDATE patients SET ${setClauses} WHERE id = ?`).run(...values);
+    stmt.run(
+      Object.prototype.hasOwnProperty.call(update, 'name') ? update.name : null,
+      Object.prototype.hasOwnProperty.call(update, 'dob') ? update.dob : null,
+      Object.prototype.hasOwnProperty.call(update, 'ssn') ? update.ssn : null,
+      Object.prototype.hasOwnProperty.call(update, 'diagnosis') ? update.diagnosis : null,
+      update.id
+    );
   });
   res.json({ message: 'Bulk update complete' });
 });

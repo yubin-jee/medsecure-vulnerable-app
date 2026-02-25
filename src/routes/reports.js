@@ -30,7 +30,9 @@ router.get('/download', (req, res) => {
     return res.status(400).json({ error: 'Invalid file name' });
   }
   const filePath = path.join('/reports', filename);
-  res.sendFile(filePath);
+  const content = fs.readFileSync(filePath);
+  res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+  res.send(content);
 });
 
 // FIX: Path traversal (CWE-22) - sanitize path to strip directory traversal characters

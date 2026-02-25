@@ -45,18 +45,24 @@ router.delete('/:id', (req, res) => {
   res.json({ message: 'Patient deleted' });
 });
 
-// FIX: SQL Injection (CWE-89) - use parameterized queries with allowlisted columns for bulk update
-const ALLOWED_PATIENT_COLUMNS = new Set(['name', 'dob', 'ssn', 'diagnosis']);
+// FIX: SQL Injection (CWE-89) - use parameterized queries with static column allowlist for bulk update
+// Column names are drawn from a static array (never from user input) to prevent injection.
+const ALLOWED_PATIENT_COLUMNS = ['name', 'dob', 'ssn', 'diagnosis'];
 
 router.post('/bulk-update', (req, res) => {
   const updates = req.body;
   updates.forEach(update => {
-    const entries = Object.entries(update).filter(([key]) => key !== 'id' && ALLOWED_PATIENT_COLUMNS.has(key));
-    if (entries.length === 0) return;
-    const setClauses = entries.map(([key]) => `${key} = ?`).join(', ');
-    const values = entries.map(([, val]) => val);
+    const setClauses = [];
+    const values = [];
+    for (const col of ALLOWED_PATIENT_COLUMNS) {
+      if (Object.prototype.hasOwnProperty.call(update, col)) {
+        setClauses.push(col + ' = ?');
+        values.push(update[col]);
+      }
+    }
+    if (setClauses.length === 0) return;
     values.push(update.id);
-    db.prepare(`UPDATE patients SET ${setClauses} WHERE id = ?`).run(...values);
+    db.prepare('UPDATE patients SET ' + setClauses.join(', ') + ' WHERE id = ?').run(...values);
   });
   res.json({ message: 'Bulk update complete' });
 });

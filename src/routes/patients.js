@@ -1,8 +1,21 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const db = require('../utils/database');
 
+// Rate limiter for patient routes to prevent abuse
+const patientRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+router.use(patientRateLimiter);
+
 // FIXED: SQL Injection (CWE-89) - use parameterized query
+// Rate limiting applied via router-level middleware above
 router.get('/search', (req, res) => {
   const name = req.query.name;
   const query = "SELECT * FROM patients WHERE name LIKE ?";
@@ -11,6 +24,7 @@ router.get('/search', (req, res) => {
 });
 
 // FIXED: SQL Injection (CWE-89) - use parameterized query
+// Rate limiting applied via router-level middleware above
 router.get('/:id', (req, res) => {
   const patientId = req.params.id;
   const query = "SELECT * FROM patients WHERE id = ?";
@@ -22,6 +36,7 @@ router.get('/:id', (req, res) => {
 });
 
 // FIXED: SQL Injection (CWE-89) - use parameterized query in INSERT
+// Rate limiting applied via router-level middleware above
 router.post('/', (req, res) => {
   const { name, dob, ssn, diagnosis } = req.body;
   const query = "INSERT INTO patients (name, dob, ssn, diagnosis) VALUES (?, ?, ?, ?)";
@@ -30,6 +45,7 @@ router.post('/', (req, res) => {
 });
 
 // FIXED: SQL Injection (CWE-89) - use parameterized query in UPDATE
+// Rate limiting applied via router-level middleware above
 router.put('/:id', (req, res) => {
   const { diagnosis } = req.body;
   const id = req.params.id;
@@ -39,6 +55,7 @@ router.put('/:id', (req, res) => {
 });
 
 // FIXED: SQL Injection (CWE-89) - use parameterized query in DELETE
+// Rate limiting applied via router-level middleware above
 router.delete('/:id', (req, res) => {
   const id = req.params.id;
   db.prepare("DELETE FROM patients WHERE id = ?").run(id);

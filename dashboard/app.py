@@ -149,36 +149,46 @@ def sync_pr_states(config: Config, session_dicts: list[dict], state: dict) -> No
 
 
 def compute_pipeline_stages(alert_summary, session_dicts, queued_batches):
-    """Compute alert counts for each pipeline stage."""
+    """Compute counts for each pipeline stage.
+
+    Counts PRs (sessions), not individual alerts, so the numbers match
+    what engineers actually see on GitHub.
+    """
     total_open = alert_summary.get("total", 0)
 
-    # Count alerts in each session status
+    # Count sessions in each stage
     devin_working = 0
     pr_created = 0
     engineer_review = 0
     resolved = 0
 
+    # Also count alerts for the "detected" calculation
+    alerts_in_pipeline = 0
+
     for s in session_dicts:
-        alert_count = len(s.get("alert_numbers", []))
         status = s.get("status", "")
         has_pr = bool(s.get("pr_url"))
+        alert_count = len(s.get("alert_numbers", []))
 
         if status in ("merged", "closed"):
-            resolved += alert_count
+            resolved += 1
+            alerts_in_pipeline += alert_count
         elif status in ("needs_human_review", "review_ready"):
-            # Both "review_ready" (CodeQL passing, needs merge) and
-            # "needs_human_review" (out-of-scope alert) need an engineer
-            engineer_review += alert_count
+            engineer_review += 1
+            alerts_in_pipeline += alert_count
+        elif status == "finished" and has_pr:
+            pr_created += 1
+            alerts_in_pipeline += alert_count
         elif has_pr:
-            # Has a PR but CodeQL still running or Devin retrying
-            pr_created += alert_count
-        elif status in ("running", "working", "blocked"):
-            # Still working, no PR yet
-            devin_working += alert_count
+            # Has a PR but still running/blocked (Devin retrying)
+            pr_created += 1
+            alerts_in_pipeline += alert_count
+        elif status in ("running", "working", "blocked", "finished"):
+            devin_working += 1
+            alerts_in_pipeline += alert_count
 
-    # "Detected" = total open alerts minus those already in the pipeline
-    in_pipeline = devin_working + pr_created + engineer_review
-    detected = max(0, total_open - in_pipeline)
+    # "Detected" = total open alerts minus those already being worked on
+    detected = max(0, total_open - alerts_in_pipeline)
 
     return {
         "detected": detected,

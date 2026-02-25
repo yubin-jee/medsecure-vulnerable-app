@@ -36,7 +36,12 @@ def normalize_status(raw_status: str) -> str:
 
 def update_session_status(config: Config, session: DevinSession) -> DevinSession:
     """Check the current status of a Devin session and update our tracking."""
-    if session.status in ("finished", "failed"):
+    # Skip sessions that are already fully resolved or have been verified
+    if session.status in ("merged", "closed", "review_ready", "needs_human_review"):
+        return session
+
+    # Skip failed sessions with no session ID (dispatch failures)
+    if session.status == "failed" and not session.session_id:
         return session
 
     if not session.session_id:
@@ -145,12 +150,19 @@ def get_session_summary(sessions: list[DevinSession]) -> dict:
     }
 
     for session in sessions:
-        # Normalize status before counting
-        normalized = normalize_status(session.status)
-        if normalized in summary:
-            summary[normalized] += 1
-        if normalized == "needs_review":
+        status = session.status
+        # Map our internal statuses to summary buckets
+        if status in ("running", "working"):
+            summary["running"] += 1
+        elif status == "blocked":
+            summary["blocked"] += 1
+        elif status in ("finished", "review_ready", "merged", "closed"):
+            summary["finished"] += 1
+        elif status in ("failed", "error"):
+            summary["failed"] += 1
+        elif status == "needs_human_review":
             summary["needs_review"] += 1
+
         if session.pr_url:
             summary["prs_created"] += 1
         summary["alerts_addressed"] += len(session.alert_numbers)

@@ -193,6 +193,41 @@ def notify_session_failed(
     return send_to(config, "security", blocks)
 
 
+def notify_retry_sent(
+    config: Config,
+    session: DevinSession,
+    batch_description: str,
+    remaining_alerts: int,
+) -> bool:
+    """
+    #security — A PR had failing CodeQL checks and Devin has been
+    sent a retry to fix the remaining issues.
+    """
+    pr_num = session.pr_url.rstrip("/").split("/")[-1] if session.pr_url else "?"
+
+    blocks = [
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": f"PR #{pr_num} — CodeQL Failing, Retry Sent"},
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"Devin's PR has {remaining_alerts} failing CodeQL check(s). "
+                    f"A retry message has been sent automatically.\n\n"
+                    f"*Fix:* {batch_description}\n"
+                    f"*PR:* <{session.pr_url}|View PR #{pr_num}>\n"
+                    f"*Devin:* <{session.url}|View Session>"
+                ),
+            },
+        },
+    ]
+
+    return send_to(config, "security", blocks)
+
+
 # --- #engineering channel ---
 
 def notify_pr_ready(

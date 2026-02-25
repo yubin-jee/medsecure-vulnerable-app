@@ -28,6 +28,7 @@ from notify import (
     notify_pr_ready,
     notify_session_failed,
     notify_needs_human_review,
+    notify_retry_sent,
 )
 from checks import check_and_retry_sessions
 from state import (
@@ -82,7 +83,7 @@ def run_pipeline(config: Config, notify: bool = True) -> dict:
     else:
         logger.info(f"{len(new_alerts)} new alerts to process.")
 
-    batches = group_alerts(new_alerts) if new_alerts else []
+    batches = group_alerts(new_alerts, demo_mode=config.demo_mode) if new_alerts else []
 
     for batch in batches:
         logger.info(
@@ -157,17 +158,37 @@ def run_pipeline(config: Config, notify: bool = True) -> dict:
         # Track which sessions we've already notified about
         notified_sessions = set(state.get("notified_sessions", []))
 
+        # Notify about retry actions from Step 4.5
+        for action in retry_actions:
+            sid = action["session_id"]
+            if sid in notified_sessions:
+                continue
+            info = state.get("batch_info", {})
+            session_obj = next((s for s in all_sessions if s.session_id == sid), None)
+            if not session_obj:
+                continue
+            batch_desc = info.get(session_obj.batch_id, {}).get("description", "Security fix")
+
+            if action["action"] == "retry":
+                notify_retry_sent(config, session_obj, batch_desc, action.get("remaining_alerts", 0))
+                logger.info(f"Sent retry notification to #security for {sid}.")
+                # Don't mark as notified — we still want to notify when it passes/fails later
+
         for session in all_sessions:
             if session.session_id in notified_sessions:
                 continue
 
             batch_desc = next(
                 (b.description for b in batches if b.batch_id == session.batch_id),
-                "Security fix",
+                None,
             )
+            if not batch_desc:
+                # Fall back to stored batch info (for sessions from prior runs)
+                info = state.get("batch_info", {}).get(session.batch_id, {})
+                batch_desc = info.get("description", "Security fix")
 
             # #engineering — PR ready for code review
-            if session.status == "finished" and session.pr_url:
+            if session.status in ("finished", "review_ready") and session.pr_url:
                 notify_pr_ready(config, session, batch_desc)
                 notified_sessions.add(session.session_id)
 
@@ -194,11 +215,22 @@ def run_pipeline(config: Config, notify: bool = True) -> dict:
         update_session_in_state(state, session)
 
     session_summary = get_session_summary(all_sessions)
+
+    # Count truly fixed alerts: sessions that are merged, closed, or review_ready
+    # (not just "finished" — that only means Devin stopped working)
+    fixed_count = sum(
+        len(s.alert_numbers) for s in all_sessions
+        if s.status in ("merged", "closed", "review_ready")
+    )
+    active_count = sum(
+        1 for s in all_sessions
+        if s.status in ("running", "working", "blocked")
+    )
     record_history(
         state,
         total_open=summary["total"],
-        fixed=session_summary["finished"],
-        in_progress=session_summary["running"],
+        fixed=fixed_count,
+        in_progress=active_count,
     )
     save_state(state)
 

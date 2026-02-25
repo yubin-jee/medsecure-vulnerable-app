@@ -3,9 +3,9 @@ SecureFlow Orchestrator - PR Check Monitor & Retry
 
 Checks whether PRs created by Devin pass CodeQL checks.
 Three outcomes:
-1. CodeQL passing → mark as verified
-2. CodeQL failing with fixable alerts → send Devin a retry
-3. CodeQL failing with no clear alerts → flag for human review (out-of-scope alert)
+1. CodeQL passing → mark as "review_ready"
+2. CodeQL failing with new alerts (annotations) → send Devin a retry
+3. CodeQL failing with 0 annotations → flag for human review (out-of-scope)
 """
 
 from __future__ import annotations
@@ -19,48 +19,57 @@ logger = logging.getLogger(__name__)
 
 
 def get_pr_check_status(config: Config, pr_number: int) -> dict:
-    """Get the CodeQL check status and PR state for a specific PR."""
-    pr_url = (
-        f"{config.github_api_base}/repos/{config.github_owner}/{config.github_repo}"
-        f"/pulls/{pr_number}"
-    )
-    resp = requests.get(pr_url, headers=config.github_headers)
+    """
+    Get the CodeQL check status for a specific PR.
+
+    Uses check-run annotations to detect new alerts introduced by the PR,
+    because the code-scanning/alerts?ref={branch} API doesn't reliably
+    return "new in PR" alerts on feature branches.
+    """
+    base = f"{config.github_api_base}/repos/{config.github_owner}/{config.github_repo}"
+
+    # Get PR metadata
+    resp = requests.get(f"{base}/pulls/{pr_number}", headers=config.github_headers)
     resp.raise_for_status()
     pr_data = resp.json()
     head_sha = pr_data["head"]["sha"]
     branch = pr_data["head"]["ref"]
-    pr_state = pr_data["state"]  # "open" or "closed"
+    pr_state = pr_data["state"]
     merged = pr_data.get("merged", False)
 
     # Get check runs for this commit
-    checks_url = (
-        f"{config.github_api_base}/repos/{config.github_owner}/{config.github_repo}"
-        f"/commits/{head_sha}/check-runs"
+    resp = requests.get(
+        f"{base}/commits/{head_sha}/check-runs", headers=config.github_headers
     )
-    resp = requests.get(checks_url, headers=config.github_headers)
     resp.raise_for_status()
     checks = resp.json()
 
     codeql_status = "unknown"
+    codeql_run_id = None
+    codeql_title = ""
     for run in checks.get("check_runs", []):
-        if run["name"] == "CodeQL":
+        name = run.get("name", "").lower()
+        if "codeql" in name or "code-scanning" in name:
             codeql_status = run.get("conclusion") or run.get("status", "unknown")
+            codeql_run_id = run["id"]
+            codeql_title = run.get("output", {}).get("title", "")
             break
 
-    # Get code scanning alerts on the PR merge ref
-    # IMPORTANT: GitHub's branch ref often returns 0 alerts even when the PR
-    # has failing checks. The merge ref (refs/pull/N/merge) is what CodeQL
-    # actually analyzes, so we must query that instead.
-    alerts_url = (
-        f"{config.github_api_base}/repos/{config.github_owner}/{config.github_repo}"
-        f"/code-scanning/alerts?ref=refs/pull/{pr_number}/merge&state=open"
-    )
-    try:
-        resp = requests.get(alerts_url, headers=config.github_headers)
-        resp.raise_for_status()
-        open_alerts = resp.json()
-    except Exception:
-        open_alerts = []
+    # If CodeQL is failing, fetch check-run annotations to see the actual alerts.
+    # The code-scanning/alerts?ref={branch} API returns 0 for PR branches because
+    # "new alerts in code changed by this PR" are tracked as check-run annotations,
+    # not as repo-level code-scanning alerts on the branch ref.
+    annotations = []
+    if codeql_status == "failure" and codeql_run_id:
+        try:
+            resp = requests.get(
+                f"{base}/check-runs/{codeql_run_id}/annotations",
+                headers=config.github_headers,
+            )
+            resp.raise_for_status()
+            annotations = resp.json()
+        except Exception:
+            annotations = []
 
     return {
         "pr_number": pr_number,
@@ -69,8 +78,9 @@ def get_pr_check_status(config: Config, pr_number: int) -> dict:
         "pr_state": pr_state,
         "merged": merged,
         "codeql_status": codeql_status,
-        "open_alerts_on_branch": len(open_alerts),
-        "alerts": open_alerts,
+        "codeql_title": codeql_title,
+        "annotations": annotations,
+        "annotation_count": len(annotations),
     }
 
 
@@ -82,22 +92,23 @@ def extract_pr_number(pr_url: str) -> int:
 
 def build_retry_prompt(check_info: dict) -> str:
     """Build a follow-up prompt for Devin to fix remaining alerts."""
-    alerts = check_info.get("alerts", [])
+    annotations = check_info.get("annotations", [])
+    count = check_info["annotation_count"]
+    title = check_info.get("codeql_title", "")
 
     prompt = (
-        f"The PR you created still has {check_info['open_alerts_on_branch']} "
-        f"CodeQL alert(s) that need to be fixed. The CodeQL check is failing.\n\n"
-        f"Please fix the remaining issues:\n\n"
+        f"The PR you created has a failing CodeQL check: {title}\n\n"
+        f"Please fix the following {count} issue(s):\n\n"
     )
 
-    for alert in alerts[:10]:
-        rule = alert.get("rule", {})
-        loc = alert.get("most_recent_instance", {}).get("location", {})
-        prompt += (
-            f"- **{rule.get('description', 'Unknown')}** "
-            f"({rule.get('security_severity_level', 'unknown')} severity) "
-            f"at `{loc.get('path', '?')}:{loc.get('start_line', '?')}`\n"
-        )
+    for ann in annotations[:10]:
+        path = ann.get("path", "?")
+        line = ann.get("start_line", "?")
+        ann_title = ann.get("title", "Unknown issue")
+        message = ann.get("message", "")
+        if len(message) > 200:
+            message = message[:200] + "..."
+        prompt += f"- **{ann_title}** at `{path}:{line}` — {message}\n"
 
     prompt += (
         "\n\nPlease update the existing PR branch with fixes for these remaining alerts. "
@@ -113,21 +124,22 @@ def check_and_retry_sessions(
     state: dict,
 ) -> list[dict]:
     """
-    Check all finished sessions with PRs for CodeQL status.
+    Check finished/blocked sessions with PRs for CodeQL status.
 
     Three outcomes per PR:
-    1. Passing or merged → mark session as "verified"
-    2. Failing with fixable alerts → retry via Devin
-    3. Failing with 0 branch alerts → flag as "needs_human_review"
-       (the alert is from adjacent/out-of-scope code, Devin can't fix it)
+    1. Passing or merged → mark as verified
+    2. Failing with annotations (new alerts) → retry via Devin
+    3. Failing with 0 annotations → flag as "needs_human_review"
     """
     actions = []
     already_checked = set(state.get("verified_sessions", []))
 
     for session in sessions:
-        # Check sessions that have a PR and are either finished or blocked
-        # (Devin goes "blocked" when it creates a PR and CodeQL fails)
-        if session.status not in ("finished", "blocked") or not session.pr_url:
+        if not session.pr_url:
+            continue
+
+        # Skip sessions that are already in a terminal/verified state
+        if session.status in ("merged", "closed", "review_ready", "needs_human_review"):
             continue
 
         if session.session_id in already_checked:
@@ -142,13 +154,15 @@ def check_and_retry_sessions(
             continue
 
         status = check_info["codeql_status"]
-        remaining = check_info["open_alerts_on_branch"]
+        annotation_count = check_info["annotation_count"]
         pr_state = check_info["pr_state"]
         merged = check_info["merged"]
 
-        # PR was merged — it's done
+        # PR was merged or closed
         if merged or pr_state == "closed":
-            logger.info(f"PR #{pr_number}: {'Merged' if merged else 'Closed'}. Marking verified.")
+            logger.info(
+                f"PR #{pr_number}: {'Merged' if merged else 'Closed'}. Marking done."
+            )
             session.status = "merged" if merged else "closed"
             already_checked.add(session.session_id)
             actions.append({
@@ -158,9 +172,9 @@ def check_and_retry_sessions(
             })
             continue
 
-        # CodeQL passing — verified, ready for human merge
+        # CodeQL passing — ready for engineer review
         if status == "success":
-            logger.info(f"PR #{pr_number}: CodeQL PASSING. Ready for engineer review.")
+            logger.info(f"PR #{pr_number}: CodeQL PASSING. Ready for review.")
             session.status = "review_ready"
             already_checked.add(session.session_id)
             actions.append({
@@ -170,11 +184,11 @@ def check_and_retry_sessions(
             })
             continue
 
-        # CodeQL failing with alerts on the branch — Devin can retry
-        if status == "failure" and remaining > 0:
+        # CodeQL failing with annotations — Devin can retry
+        if status == "failure" and annotation_count > 0:
             logger.warning(
-                f"PR #{pr_number}: CodeQL FAILING, {remaining} alert(s) on branch. "
-                f"Sending Devin a retry."
+                f"PR #{pr_number}: CodeQL FAILING — "
+                f"{check_info['codeql_title']}. Sending Devin a retry."
             )
             retry_prompt = build_retry_prompt(check_info)
             try:
@@ -184,11 +198,11 @@ def check_and_retry_sessions(
                     "action": "retry",
                     "session_id": session.session_id,
                     "pr_number": pr_number,
-                    "remaining_alerts": remaining,
+                    "remaining_alerts": annotation_count,
                 })
-                logger.info(f"Retry sent to session {session.session_id}.")
+                logger.info(f"Retry message sent to session {session.session_id}.")
             except Exception as e:
-                logger.error(f"Retry failed for session {session.session_id}: {e}")
+                logger.error(f"Retry failed for {session.session_id}: {e}")
                 actions.append({
                     "action": "retry_failed",
                     "session_id": session.session_id,
@@ -197,13 +211,10 @@ def check_and_retry_sessions(
                 })
             continue
 
-        # CodeQL failing but 0 alerts on the branch — out-of-scope alert
-        # This means the failing check is from an adjacent vulnerability
-        # that wasn't part of this batch. Devin can't fix it. Needs human.
-        if status == "failure" and remaining == 0:
+        # CodeQL failing but 0 annotations — out-of-scope / pre-existing alert
+        if status == "failure" and annotation_count == 0:
             logger.warning(
-                f"PR #{pr_number}: CodeQL FAILING but 0 alerts on branch. "
-                f"This is likely an out-of-scope alert from adjacent code. "
+                f"PR #{pr_number}: CodeQL FAILING but 0 annotations. "
                 f"Flagging for human review."
             )
             session.status = "needs_human_review"
@@ -212,10 +223,10 @@ def check_and_retry_sessions(
                 "session_id": session.session_id,
                 "pr_number": pr_number,
                 "reason": (
-                    "CodeQL check failing due to pre-existing alert in adjacent code. "
-                    "The fix itself is correct but a separate vulnerability in the same "
-                    "file is causing the check to fail. A human should review and either "
-                    "merge with the failing check or dismiss the unrelated alert."
+                    "CodeQL check failing due to a pre-existing alert in adjacent code. "
+                    "The fix itself is correct but a separate vulnerability is causing "
+                    "the check to fail. A human should review and either merge or "
+                    "dismiss the unrelated alert."
                 ),
             })
             continue
@@ -224,7 +235,10 @@ def check_and_retry_sessions(
         if status in ("in_progress", "queued"):
             logger.info(f"PR #{pr_number}: CodeQL still running. Will check next cycle.")
         else:
-            logger.info(f"PR #{pr_number}: CodeQL status '{status}', {remaining} alerts.")
+            logger.info(
+                f"PR #{pr_number}: CodeQL status '{status}', "
+                f"{annotation_count} annotations."
+            )
 
     state["verified_sessions"] = list(already_checked)
     return actions

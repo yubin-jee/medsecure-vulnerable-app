@@ -50,13 +50,17 @@ class AlertBatch:
         }
 
 
-def group_alerts(alerts: list[CodeQLAlert]) -> list[AlertBatch]:
+def group_alerts(alerts: list[CodeQLAlert], demo_mode: bool = False) -> list[AlertBatch]:
     """
     Group alerts by rule type and file path.
 
     Strategy: alerts with the same rule_id in the same file get batched together.
     This lets Devin fix all SQL injections in patients.js in one session,
     rather than opening 5 separate sessions.
+
+    When demo_mode is True, a curated set of high-variety vulnerability types
+    is boosted to the top of the priority list so the first dispatch showcases
+    different fix strategies (command injection, SSRF, path traversal, etc.).
     """
     groups: dict[str, list[CodeQLAlert]] = {}
 
@@ -68,7 +72,7 @@ def group_alerts(alerts: list[CodeQLAlert]) -> list[AlertBatch]:
         groups[key].append(alert)
 
     batches = []
-    for idx, (key, group_alerts) in enumerate(groups.items()):
+    for idx, (key, group_alerts_list) in enumerate(groups.items()):
         rule_id, file_path = key.split("::", 1)
 
         # Determine category from rule_id
@@ -76,21 +80,24 @@ def group_alerts(alerts: list[CodeQLAlert]) -> list[AlertBatch]:
 
         # Priority based on highest severity in the group
         highest_severity = min(
-            SEVERITY_ORDER.get(a.security_severity, 99) for a in group_alerts
+            SEVERITY_ORDER.get(a.security_severity, 99) for a in group_alerts_list
         )
 
         batch = AlertBatch(
             batch_id=f"batch-{idx + 1:03d}",
-            alerts=group_alerts,
+            alerts=group_alerts_list,
             priority=highest_severity,
             category=category,
             file_path=file_path,
-            description=build_batch_description(group_alerts),
+            description=build_batch_description(group_alerts_list),
         )
         batches.append(batch)
 
-    # Sort by priority (critical first)
-    batches.sort(key=lambda b: b.priority)
+    if demo_mode:
+        batches = _apply_demo_priority(batches)
+    else:
+        # Sort by priority (critical first)
+        batches.sort(key=lambda b: b.priority)
 
     logger.info(
         f"Grouped {len(alerts)} alerts into {len(batches)} batches. "
@@ -98,6 +105,42 @@ def group_alerts(alerts: list[CodeQLAlert]) -> list[AlertBatch]:
         + ", ".join(f"{b.batch_id} ({b.severity})" for b in batches[:5])
     )
     return batches
+
+
+# --- Demo mode priority boost ---
+# These rule+file combos produce a variety of fix strategies that showcase
+# Devin's capabilities. Only active when DEMO_MODE=true in .env.
+# Remove DEMO_MODE from .env to revert to normal critical-first ordering.
+_DEMO_BOOST = [
+    ("js/command-line-injection", "src/routes/reports.js"),
+    ("js/request-forgery", "src/routes/reports.js"),
+    ("js/remote-property-injection", "src/routes/admin.js"),
+    ("js/path-injection", "src/routes/reports.js"),
+    ("js/sql-injection", "src/routes/patients.js"),
+]
+
+
+def _apply_demo_priority(batches: list[AlertBatch]) -> list[AlertBatch]:
+    """Reorder batches so the curated demo set comes first."""
+    boosted = []
+    rest = []
+    for batch in batches:
+        rule_id = batch.alerts[0].rule_id if batch.alerts else ""
+        key = (rule_id, batch.file_path)
+        if key in _DEMO_BOOST:
+            # Assign demo priority based on position in the boost list
+            batch.priority = -len(_DEMO_BOOST) + _DEMO_BOOST.index(key)
+            boosted.append(batch)
+        else:
+            rest.append(batch)
+
+    # Sort boosted by their assigned order, rest by normal severity
+    boosted.sort(key=lambda b: b.priority)
+    rest.sort(key=lambda b: b.priority)
+    logger.info(
+        f"Demo mode: boosted {len(boosted)} batches to front of queue."
+    )
+    return boosted + rest
 
 
 def categorize_rule(rule_id: str) -> str:

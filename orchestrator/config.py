@@ -51,9 +51,23 @@ class Config:
         default_factory=lambda: int(os.getenv("DASHBOARD_PORT", "8080"))
     )
 
+    # Demo mode: when enabled, prioritizes a curated set of vulnerability types
+    # to showcase variety in the first run (command injection, SSRF, path traversal,
+    # remote property injection, SQL injection) and bumps concurrent slots to 5.
+    # Set DEMO_MODE=false or remove it for normal critical-first prioritization.
+    demo_mode: bool = field(
+        default_factory=lambda: os.getenv("DEMO_MODE", "").lower() in ("true", "1", "yes")
+    )
+
     @property
     def github_api_base(self) -> str:
         return "https://api.github.com"
+
+    def __post_init__(self):
+        # In demo mode, override concurrent sessions to 5 so the curated
+        # batch set all dispatches in a single run
+        if self.demo_mode:
+            self.max_concurrent_sessions = 5
 
     @property
     def github_headers(self) -> dict:

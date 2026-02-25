@@ -328,7 +328,7 @@
             <div class="metric">
                 <div class="lbl">Detected</div>
                 <div class="num">{{ pipeline_stages.detected }}</div>
-                <div class="hint">awaiting assignment</div>
+                <div class="hint">alerts awaiting assignment</div>
             </div>
             <div class="metric c-blue">
                 <div class="lbl">Devin Working</div>
@@ -336,14 +336,14 @@
                 <div class="hint">active sessions</div>
             </div>
             <div class="metric c-purple">
-                <div class="lbl">PR Created</div>
+                <div class="lbl">PRs Created</div>
                 <div class="num">{{ pipeline_stages.pr_created }}</div>
-                <div class="hint">awaiting review</div>
+                <div class="hint">awaiting CodeQL / review</div>
             </div>
             <div class="metric c-orange">
                 <div class="lbl">Engineer Review</div>
                 <div class="num">{{ pipeline_stages.engineer_review }}</div>
-                <div class="hint">needs human judgment</div>
+                <div class="hint">PRs ready to merge</div>
             </div>
             <div class="metric c-green">
                 <div class="lbl">Resolved</div>
@@ -592,6 +592,8 @@
                             <td>
                                 {% if s.status in ('running', 'working') %}
                                 <span class="badge b-run">running</span>
+                                {% elif s.status == 'finished' and s.pr_url %}
+                                <span class="badge b-done">PR ready</span>
                                 {% elif s.status == 'finished' %}
                                 <span class="badge b-done">done</span>
                                 {% elif s.status == 'review_ready' %}

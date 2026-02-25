@@ -1,0 +1,77 @@
+# SecureFlow — Automated CodeQL Remediation via Devin
+#
+# This workflow ingests open CodeQL alerts, batches them by vulnerability
+# type and file, dispatches each batch to Devin for autonomous fixing,
+# monitors session progress, verifies PRs pass CodeQL, and retries or
+# escalates as needed.
+#
+# Triggers:
+#   - On a schedule (every 2 hours) to pick up new alerts and check progress
+#   - When a new code scanning alert is created
+#   - Manually via workflow_dispatch
+#
+# Each run is idempotent — it skips already-processed alerts and only
+# dispatches new batches when concurrent session slots are available.
+
+name: SecureFlow
+
+on:
+  schedule:
+    # Run every 2 hours to pick up new alerts and check session progress
+    - cron: "0 */2 * * *"
+
+  # Trigger when CodeQL finds a new alert
+  code_scanning_alert:
+    types: [created]
+
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: read
+  pull-requests: read
+
+jobs:
+  remediate:
+    name: Remediate CodeQL Alerts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r orchestrator/requirements.txt
+
+      - name: Restore state from cache
+        uses: actions/cache@v4
+        with:
+          path: orchestrator/state.json
+          key: secureflow-state-${{ github.repository }}
+          restore-keys: secureflow-state-
+
+      - name: Run SecureFlow pipeline
+        working-directory: orchestrator
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPO: ${{ github.event.repository.name }}
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+          SLACK_WEBHOOK_SECURITY: ${{ secrets.SLACK_WEBHOOK_SECURITY }}
+          SLACK_WEBHOOK_ENGINEERING: ${{ secrets.SLACK_WEBHOOK_ENGINEERING }}
+          SLACK_WEBHOOK_ALL: ${{ secrets.SLACK_WEBHOOK_ALL }}
+          MAX_CONCURRENT_SESSIONS: "5"
+        run: python main.py --mode once
+
+      - name: Save state to cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: orchestrator/state.json
+          key: secureflow-state-${{ github.repository }}-${{ github.run_id }}

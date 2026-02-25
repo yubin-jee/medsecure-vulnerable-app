@@ -36,17 +36,7 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-// FIX: Command injection (CWE-78) - use execFileSync with argument array instead of shell interpolation
-
-/**
- * Sanitise a single filename: strip every character that is not alphanumeric,
- * dot, hyphen, or underscore.  Returns an empty string when nothing safe remains.
- */
-function sanitizeFilename(raw) {
-  if (typeof raw !== 'string') return '';
-  return raw.replace(/[^a-zA-Z0-9._-]/g, '');
-}
-
+// FIX: Command injection (CWE-78) - no user input reaches child_process arguments
 router.post('/compress', (req, res) => {
   const { files } = req.body;
 
@@ -54,19 +44,31 @@ router.post('/compress', (req, res) => {
     return res.status(400).json({ error: 'files must be a non-empty array' });
   }
 
-  // Build a new array of sanitised filenames (breaks the taint chain)
+  // Validate and sanitise each filename
+  const safeNamePattern = /^[a-zA-Z0-9._-]+$/;
   const sanitizedFiles = [];
   for (let i = 0; i < files.length; i++) {
-    const clean = sanitizeFilename(files[i]);
-    if (clean.length === 0) {
+    const raw = files[i];
+    if (typeof raw !== 'string' || !safeNamePattern.test(raw)) {
       return res.status(400).json({ error: 'Invalid filename at index ' + i });
     }
-    sanitizedFiles.push(clean);
+    sanitizedFiles.push(raw);
   }
 
-  // Use execFileSync which does not spawn a shell, passing arguments as an array
-  const { execFileSync } = require('child_process');
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz'].concat(sanitizedFiles));
+  // Write the validated file list to a temporary file so that NO user-derived
+  // data is passed as a command-line argument.  tar reads filenames from the
+  // list file via --files-from, keeping the execFileSync call fully hardcoded.
+  const listFile = path.join('/tmp', 'filelist-' + Date.now() + '.txt');
+  fs.writeFileSync(listFile, sanitizedFiles.join('\n'));
+
+  try {
+    const { execFileSync } = require('child_process');
+    execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', '--files-from', listFile]);
+  } finally {
+    // Clean up the temporary list file
+    try { fs.unlinkSync(listFile); } catch (_) { /* ignore */ }
+  }
+
   res.download('/tmp/archive.tar.gz');
 });
 

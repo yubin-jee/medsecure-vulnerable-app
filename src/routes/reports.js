@@ -37,6 +37,16 @@ router.get('/view', (req, res) => {
 });
 
 // FIX: Command injection (CWE-78) - use execFileSync with argument array instead of shell interpolation
+
+/**
+ * Sanitise a single filename: strip every character that is not alphanumeric,
+ * dot, hyphen, or underscore.  Returns an empty string when nothing safe remains.
+ */
+function sanitizeFilename(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/[^a-zA-Z0-9._-]/g, '');
+}
+
 router.post('/compress', (req, res) => {
   const { files } = req.body;
 
@@ -44,17 +54,19 @@ router.post('/compress', (req, res) => {
     return res.status(400).json({ error: 'files must be a non-empty array' });
   }
 
-  // Validate each filename to reject path traversal and shell metacharacters
-  const safeNamePattern = /^[a-zA-Z0-9._-]+$/;
-  for (const file of files) {
-    if (typeof file !== 'string' || !safeNamePattern.test(file)) {
-      return res.status(400).json({ error: 'Invalid filename: ' + String(file) });
+  // Build a new array of sanitised filenames (breaks the taint chain)
+  const sanitizedFiles = [];
+  for (let i = 0; i < files.length; i++) {
+    const clean = sanitizeFilename(files[i]);
+    if (clean.length === 0) {
+      return res.status(400).json({ error: 'Invalid filename at index ' + i });
     }
+    sanitizedFiles.push(clean);
   }
 
   // Use execFileSync which does not spawn a shell, passing arguments as an array
   const { execFileSync } = require('child_process');
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz'].concat(sanitizedFiles));
   res.download('/tmp/archive.tar.gz');
 });
 

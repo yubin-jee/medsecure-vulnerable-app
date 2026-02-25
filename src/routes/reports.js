@@ -51,7 +51,7 @@ router.post('/compress', (req, res) => {
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'Invalid files list' });
   }
-  const args = ['-czf', '/tmp/archive.tar.gz'].concat(files);
+  const args = ['-czf', '/tmp/archive.tar.gz', '--'].concat(files);
   execFileSync('tar', args);
   res.download('/tmp/archive.tar.gz');
 });

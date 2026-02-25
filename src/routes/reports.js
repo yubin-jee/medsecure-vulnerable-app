@@ -36,7 +36,10 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-// FIX: Command injection (CWE-78) - no user input reaches child_process arguments
+// FIX: Command injection (CWE-78) - replaced shell command with the `tar` library.
+// No child_process usage; archive is created entirely in-process.
+const tar = require('tar');
+
 router.post('/compress', (req, res) => {
   const { files } = req.body;
 
@@ -44,32 +47,24 @@ router.post('/compress', (req, res) => {
     return res.status(400).json({ error: 'files must be a non-empty array' });
   }
 
-  // Validate and sanitise each filename
-  const safeNamePattern = /^[a-zA-Z0-9._-]+$/;
-  const sanitizedFiles = [];
+  // Validate each filename: only alphanumeric, dots, hyphens, and underscores.
+  // Reject anything that could be a path traversal or start with '-'.
+  const safeNamePattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
   for (let i = 0; i < files.length; i++) {
-    const raw = files[i];
-    if (typeof raw !== 'string' || !safeNamePattern.test(raw)) {
+    if (typeof files[i] !== 'string' || !safeNamePattern.test(files[i])) {
       return res.status(400).json({ error: 'Invalid filename at index ' + i });
     }
-    sanitizedFiles.push(raw);
   }
 
-  // Write the validated file list to a temporary file so that NO user-derived
-  // data is passed as a command-line argument.  tar reads filenames from the
-  // list file via --files-from, keeping the execFileSync call fully hardcoded.
-  const listFile = path.join('/tmp', 'filelist-' + Date.now() + '.txt');
-  fs.writeFileSync(listFile, sanitizedFiles.join('\n'));
+  const archivePath = '/tmp/archive.tar.gz';
 
-  try {
-    const { execFileSync } = require('child_process');
-    execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', '--files-from', listFile]);
-  } finally {
-    // Clean up the temporary list file
-    try { fs.unlinkSync(listFile); } catch (_) { /* ignore */ }
-  }
-
-  res.download('/tmp/archive.tar.gz');
+  tar.create({ gzip: true, file: archivePath }, files)
+    .then(() => {
+      res.download(archivePath);
+    })
+    .catch((err) => {
+      res.status(500).json({ error: 'Failed to create archive' });
+    });
 });
 
 // FIX: Server-Side Request Forgery (CWE-918) - use allowlisted URLs only

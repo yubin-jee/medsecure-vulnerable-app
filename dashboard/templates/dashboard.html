@@ -247,6 +247,68 @@
             margin-top: 6px;
         }
         .impact-metric .im-compare span { color: var(--text-1); }
+
+        /* Tooltip for business impact breakdown */
+        .impact-metric { position: relative; cursor: pointer; }
+        .im-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-1);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-1);
+            text-align: left;
+            white-space: nowrap;
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0,0,0,.4);
+        }
+        .im-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--border);
+        }
+        .impact-metric:hover .im-tooltip { display: block; }
+        .im-tooltip .tt-heading {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-2);
+            margin-bottom: 6px;
+        }
+        .im-tooltip .tt-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+        }
+        .im-tooltip .tt-row .tt-val { color: var(--text-0); font-weight: 600; }
+        .im-tooltip .tt-divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 6px 0;
+        }
+        .im-tooltip .tt-total {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            font-weight: 700;
+            color: var(--text-0);
+        }
+        .im-tooltip .tt-source {
+            font-size: 10px;
+            color: var(--text-2);
+            font-style: italic;
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -293,16 +355,50 @@
         <!-- Business Impact -->
         <div class="impact-metrics">
             <div class="impact-metric">
+                <div class="im-tooltip">
+                    <div class="tt-heading">How this is calculated</div>
+                    <div class="tt-row">
+                        <span>{{ business_impact.hipaa_critical_count }} critical alerts &times; ${{ "{:,.0f}".format(business_impact.hipaa_critical_rate) }}</span>
+                        <span class="tt-val">${{ "{:,.0f}".format(business_impact.hipaa_critical_count * business_impact.hipaa_critical_rate) }}</span>
+                    </div>
+                    <div class="tt-row">
+                        <span>{{ business_impact.hipaa_high_count }} high alerts &times; ${{ "{:,.0f}".format(business_impact.hipaa_high_rate) }}</span>
+                        <span class="tt-val">${{ "{:,.0f}".format(business_impact.hipaa_high_count * business_impact.hipaa_high_rate) }}</span>
+                    </div>
+                    <hr class="tt-divider">
+                    <div class="tt-total">
+                        <span>Total exposure</span>
+                        <span>${{ "{:,.0f}".format(business_impact.hipaa_exposure) }}</span>
+                    </div>
+                    <div class="tt-source">HIPAA Tier 3/4 penalty rates per 42 USC &sect;1320d-5 (HITECH Act, 2024 adj.)</div>
+                </div>
                 <div class="im-lbl">HIPAA Risk Exposure</div>
                 <div class="im-num" style="color: var(--red);">
                     ${{ "{:,.0f}".format(business_impact.hipaa_exposure) }}
                 </div>
                 <div class="im-sub">potential fines for unpatched known vulnerabilities</div>
                 <div class="im-sub" style="margin-top: 6px; font-style: italic;">
-                    Based on HIPAA Tier 3/4 penalty schedules (HITECH Act)
+                    Hover for breakdown
                 </div>
             </div>
             <div class="impact-metric">
+                <div class="im-tooltip">
+                    <div class="tt-heading">How this is calculated</div>
+                    <div class="tt-row">
+                        <span>Sessions with PRs measured</span>
+                        <span class="tt-val">{{ business_impact.mttr_sessions_counted }}</span>
+                    </div>
+                    <div class="tt-row">
+                        <span>Avg session start &rarr; PR created</span>
+                        <span class="tt-val">{% if business_impact.mttr_minutes is not none %}{{ business_impact.mttr_minutes }} min{% else %}&mdash;{% endif %}</span>
+                    </div>
+                    <hr class="tt-divider">
+                    <div class="tt-row">
+                        <span>Industry avg (manual remediation)</span>
+                        <span class="tt-val">{{ business_impact.industry_mttr_days }} days</span>
+                    </div>
+                    <div class="tt-source">Industry benchmark from AppSec remediation studies</div>
+                </div>
                 <div class="im-lbl">Mean Time to Fix</div>
                 {% if business_impact.mttr_minutes is not none %}
                 <div class="im-num" style="color: var(--green);">
@@ -314,9 +410,30 @@
                 <div class="im-compare">
                     Industry avg: <span>{{ business_impact.industry_mttr_days }} days</span>
                 </div>
-                <div class="im-sub">Devin resolves vulnerabilities in minutes, not weeks</div>
+                <div class="im-sub">Hover for breakdown</div>
             </div>
             <div class="impact-metric">
+                <div class="im-tooltip">
+                    <div class="tt-heading">How this is calculated</div>
+                    <div class="tt-row">
+                        <span>Avg healthcare breach cost</span>
+                        <span class="tt-val">${{ "{:,.0f}".format(business_impact.risk_total_exposure) }}</span>
+                    </div>
+                    <div class="tt-row">
+                        <span>Vulnerability surface resolved</span>
+                        <span class="tt-val">{{ business_impact.risk_pct_resolved }}%</span>
+                    </div>
+                    <div class="tt-row">
+                        <span>Vulnerabilities fixed</span>
+                        <span class="tt-val">{{ business_impact.resolved_alerts }}</span>
+                    </div>
+                    <hr class="tt-divider">
+                    <div class="tt-total">
+                        <span>Risk reduced</span>
+                        <span>${{ "{:,.0f}".format(business_impact.risk_reduced) }}</span>
+                    </div>
+                    <div class="tt-source">IBM Cost of a Data Breach 2024 &mdash; healthcare sector ($408/record)</div>
+                </div>
                 <div class="im-lbl">Breach Risk Reduced</div>
                 <div class="im-num" style="color: var(--green);">
                     ${{ "{:,.0f}".format(business_impact.risk_reduced) }}
@@ -325,7 +442,7 @@
                     {{ business_impact.resolved_alerts }} vulnerabilities eliminated
                 </div>
                 <div class="im-sub" style="margin-top: 6px; font-style: italic;">
-                    Based on IBM 2024 Healthcare Breach Report ($408/record)
+                    Hover for breakdown
                 </div>
             </div>
         </div>

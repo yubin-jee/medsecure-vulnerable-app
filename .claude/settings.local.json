@@ -25,7 +25,8 @@
       "WebFetch(domain:securityintelligence.com)",
       "WebFetch(domain:digitalguardian.com)",
       "WebFetch(domain:www.strongdm.com)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git reset:*)"
     ]
   }
 }

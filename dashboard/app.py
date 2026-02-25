@@ -254,9 +254,16 @@ def compute_business_impact(alert_summary, session_dicts, batch_info):
 
     return {
         "hipaa_exposure": hipaa_exposure,
+        "hipaa_critical_count": critical_open,
+        "hipaa_critical_rate": HIPAA_TIER4_PER_VIOLATION,
+        "hipaa_high_count": high_open,
+        "hipaa_high_rate": HIPAA_TIER3_PER_VIOLATION,
         "mttr_minutes": mttr_minutes,
+        "mttr_sessions_counted": len(session_times),
         "industry_mttr_days": INDUSTRY_AVG_MTTR_DAYS,
         "risk_reduced": risk_reduced,
+        "risk_total_exposure": AVG_BREACH_COST_HEALTHCARE,
+        "risk_pct_resolved": round((weighted_resolved / weighted_total * 100) if weighted_total > 0 else 0),
         "resolved_alerts": resolved_alerts,
     }
 

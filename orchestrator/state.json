@@ -34,11 +34,56 @@
         20,
         19
       ],
-      "status": "review_ready",
+      "status": "finished",
       "url": "https://app.devin.ai/sessions/08b98e0c7f384c968a7542599456efbf",
       "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/8",
       "created_at": "2026-02-25T17:25:01.223093",
       "updated_at": "2026-02-25T18:30:33.265699Z",
+      "error": null
+    },
+    {
+      "session_id": "devin-e77d297238734eb4a67a55c079afa7de",
+      "batch_id": "batch-002",
+      "alert_numbers": [
+        40
+      ],
+      "status": "running",
+      "url": "https://app.devin.ai/sessions/e77d297238734eb4a67a55c079afa7de",
+      "pr_url": null,
+      "created_at": "2026-02-25T19:47:57.908230",
+      "updated_at": "2026-02-25T19:47:57.908257",
+      "error": null
+    },
+    {
+      "session_id": "devin-ccc7b388de8246d7afdbe8d7bba8a226",
+      "batch_id": "batch-005",
+      "alert_numbers": [
+        35,
+        34
+      ],
+      "status": "running",
+      "url": "https://app.devin.ai/sessions/ccc7b388de8246d7afdbe8d7bba8a226",
+      "pr_url": null,
+      "created_at": "2026-02-25T19:48:02.387189",
+      "updated_at": "2026-02-25T19:48:02.387214",
+      "error": null
+    },
+    {
+      "session_id": "devin-ae37d1624ba74f9a867ae49627f118b0",
+      "batch_id": "batch-006",
+      "alert_numbers": [
+        33,
+        32,
+        31,
+        30,
+        29,
+        27
+      ],
+      "status": "running",
+      "url": "https://app.devin.ai/sessions/ae37d1624ba74f9a867ae49627f118b0",
+      "pr_url": null,
+      "created_at": "2026-02-25T19:48:03.332155",
+      "updated_at": "2026-02-25T19:48:03.332237",
       "error": null
     }
   ],
@@ -47,16 +92,26 @@
     37,
     21,
     20,
-    19
+    19,
+    40,
+    35,
+    34,
+    33,
+    32,
+    31,
+    30,
+    29,
+    27
   ],
   "notified_sessions": [
+    "devin-08b98e0c7f384c968a7542599456efbf",
     "devin-009b3e63559041109878bfbf7509fe66",
     "devin-a7a2ad62fc134d72b295a453efb832ac"
   ],
   "verified_sessions": [
+    "devin-08b98e0c7f384c968a7542599456efbf",
     "devin-009b3e63559041109878bfbf7509fe66",
-    "devin-a7a2ad62fc134d72b295a453efb832ac",
-    "devin-08b98e0c7f384c968a7542599456efbf"
+    "devin-a7a2ad62fc134d72b295a453efb832ac"
   ],
   "batch_info": {
     "batch-003": {
@@ -211,8 +266,14 @@
       "total_open": 41,
       "fixed": 2,
       "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-25T19:48:05.208035",
+      "total_open": 40,
+      "fixed": 3,
+      "in_progress": 3
     }
   ],
-  "last_run": "2026-02-25T19:20:36.559903",
+  "last_run": "2026-02-25T19:52:00.622603",
   "initial_scan_sent": true
 }

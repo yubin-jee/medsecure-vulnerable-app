@@ -4,6 +4,13 @@ const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const sanitize = require('sanitize-filename');
+const rateLimit = require('express-rate-limit');
+
+const reportsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -24,7 +31,7 @@ router.post('/export', (req, res) => {
 });
 
 // FIX: Path traversal (CWE-22) - sanitize filename to prevent directory traversal
-router.get('/download', (req, res) => {
+router.get('/download', reportsLimiter, (req, res) => {
   const filename = req.query.file;
   if (!filename || typeof filename !== 'string') {
     return res.status(400).json({ error: 'Missing file parameter' });
@@ -38,7 +45,7 @@ router.get('/download', (req, res) => {
 });
 
 // FIX: Path traversal (CWE-22) - sanitize filename to prevent directory traversal
-router.get('/view', (req, res) => {
+router.get('/view', reportsLimiter, (req, res) => {
   const reportPath = req.query.path;
   if (!reportPath || typeof reportPath !== 'string') {
     return res.status(400).json({ error: 'Missing path parameter' });

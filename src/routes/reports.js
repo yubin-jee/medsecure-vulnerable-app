@@ -36,11 +36,25 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-// VULN: Command injection via filename (CWE-78)
+// FIX: Command injection (CWE-78) - use execFileSync with argument array instead of shell interpolation
 router.post('/compress', (req, res) => {
   const { files } = req.body;
-  const fileList = files.join(' ');
-  execSync(`tar -czf /tmp/archive.tar.gz ${fileList}`);
+
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: 'files must be a non-empty array' });
+  }
+
+  // Validate each filename to reject path traversal and shell metacharacters
+  const safeNamePattern = /^[a-zA-Z0-9._-]+$/;
+  for (const file of files) {
+    if (typeof file !== 'string' || !safeNamePattern.test(file)) {
+      return res.status(400).json({ error: 'Invalid filename: ' + String(file) });
+    }
+  }
+
+  // Use execFileSync which does not spawn a shell, passing arguments as an array
+  const { execFileSync } = require('child_process');
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
   res.download('/tmp/archive.tar.gz');
 });
 

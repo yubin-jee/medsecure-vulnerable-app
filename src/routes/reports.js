@@ -45,41 +45,38 @@ router.post('/compress', (req, res) => {
 });
 
 // FIXED: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
-const http = require('http');
 const https = require('https');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'reports.example.com',
-  'data.example.com',
-];
+// Map of allowed host keys to their base URLs
+const ALLOWED_HOST_URLS = {
+  'api': 'https://api.example.com',
+  'reports': 'https://reports.example.com',
+  'data': 'https://data.example.com',
+};
 
 router.get('/fetch-external', (req, res) => {
-  const rawUrl = req.query.url;
+  const hostKey = req.query.host;
+  const resourcePath = req.query.path;
 
-  if (!rawUrl || typeof rawUrl !== 'string') {
-    return res.status(400).json({ error: 'Missing or invalid URL parameter' });
+  if (!hostKey || typeof hostKey !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid host parameter' });
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(rawUrl);
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid URL format' });
-  }
-
-  // Only allow http and https protocols
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http and https protocols are allowed' });
-  }
-
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
+  // Look up the base URL from the allowlist using the host key
+  const baseUrl = ALLOWED_HOST_URLS[hostKey];
+  if (!baseUrl) {
     return res.status(403).json({ error: 'Requested host is not in the allowed list' });
   }
 
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl, (response) => {
+  // Construct the safe URL from trusted base URL and validated path
+  let safeUrl = baseUrl;
+  if (resourcePath && typeof resourcePath === 'string') {
+    // Sanitize path: remove path traversal sequences and ensure it starts with /
+    const sanitizedPath = '/' + resourcePath.replace(/\.\./g, '').replace(/^\/+/, '');
+    safeUrl = baseUrl + sanitizedPath;
+  }
+
+  https.get(safeUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

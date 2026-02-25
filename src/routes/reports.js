@@ -1,8 +1,18 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const tar = require('tar');
 const fs = require('fs');
 const path = require('path');
+
+// Rate limiter to prevent brute-force and abuse on sensitive endpoints
+const reportRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 // Allowlist of valid report types
 const ALLOWED_REPORT_TYPES = ['summary', 'detailed', 'monthly', 'quarterly', 'annual', 'patient', 'billing', 'audit'];
@@ -19,7 +29,7 @@ const SAFE_FILEPATH_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._/\-]*$/;
 // FIX: Alert #19 - Replaced shell command with internal report generation (CWE-78, CWE-88)
 // Previously used execSync which allowed command injection via user-controlled reportType.
 // Now uses allowlist validation and internal logic instead of spawning a shell process.
-router.get('/generate', (req, res) => {
+router.get('/generate', reportRateLimiter, (req, res) => {
   const reportType = req.query.type;
   if (!reportType || !ALLOWED_REPORT_TYPES.includes(reportType)) {
     return res.status(400).json({ error: 'Invalid report type. Allowed types: ' + ALLOWED_REPORT_TYPES.join(', ') });
@@ -37,7 +47,7 @@ router.get('/generate', (req, res) => {
 // FIX: Alert #20 - Replaced shell command with internal data conversion (CWE-78, CWE-88)
 // Previously used exec with template literal which allowed command injection via filename/format.
 // Now uses allowlist validation and internal logic instead of spawning a shell process.
-router.post('/export', (req, res) => {
+router.post('/export', reportRateLimiter, (req, res) => {
   const { filename, format } = req.body;
   const safeFilename = typeof filename === 'string' ? path.basename(filename) : '';
   if (!safeFilename || !SAFE_FILENAME_PATTERN.test(safeFilename)) {
@@ -73,7 +83,7 @@ router.get('/view', (req, res) => {
 // FIX: Alert #21 - Replaced shell command with Node.js tar library (CWE-78, CWE-88)
 // Previously used execSync which allowed command injection via user-controlled file list.
 // Now uses the 'tar' npm package which processes files internally without spawning a shell.
-router.post('/compress', (req, res) => {
+router.post('/compress', reportRateLimiter, (req, res) => {
   const { files } = req.body;
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'files must be a non-empty array.' });

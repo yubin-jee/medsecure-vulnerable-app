@@ -4,16 +4,34 @@ const { execFileSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// VULN: Command injection (CWE-78) - user input in shell command
+// Allowlist of valid report types
+const ALLOWED_REPORT_TYPES = ['summary', 'detailed', 'audit', 'compliance', 'patient', 'billing'];
+
+// Allowlist of valid export formats
+const ALLOWED_FORMATS = ['pdf', 'csv', 'json', 'xml', 'html'];
+
+// Validate that a value contains only safe characters (alphanumeric, hyphens, underscores, dots)
+function isSafeFilename(value) {
+  return /^[a-zA-Z0-9._-]+$/.test(value);
+}
+
 router.get('/generate', (req, res) => {
   const reportType = req.query.type;
+  if (!ALLOWED_REPORT_TYPES.includes(reportType)) {
+    return res.status(400).json({ error: 'Invalid report type' });
+  }
   const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
   res.send(output);
 });
 
-// VULN: Command injection (CWE-78) - template literal in exec
 router.post('/export', (req, res) => {
   const { filename, format } = req.body;
+  if (!filename || !isSafeFilename(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  if (!ALLOWED_FORMATS.includes(format)) {
+    return res.status(400).json({ error: 'Invalid format' });
+  }
   execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
@@ -36,9 +54,15 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-// VULN: Command injection via filename (CWE-78)
 router.post('/compress', (req, res) => {
   const { files } = req.body;
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: 'Files must be a non-empty array' });
+  }
+  const invalidFiles = files.filter((f) => !isSafeFilename(f));
+  if (invalidFiles.length > 0) {
+    return res.status(400).json({ error: 'Invalid filename(s) detected' });
+  }
   execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
   res.download('/tmp/archive.tar.gz');
 });

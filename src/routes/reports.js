@@ -46,12 +46,25 @@ router.post('/compress', (req, res) => {
     return res.status(400).json({ error: 'files must be a non-empty array' });
   }
 
-  // Reject filenames containing path traversal or shell metacharacters
-  const safePattern = /^[\w.\-]+$/;
+  // Validate filenames: only allow alphanumeric, hyphens, underscores, and a
+  // single dot for the extension. No path separators or traversal sequences.
+  const safePattern = /^[\w][\w\-]*(\.\w+)?$/;
   for (const file of files) {
     if (typeof file !== 'string' || !safePattern.test(file)) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
+  }
+
+  // Resolve each filename against a fixed base directory and verify it stays
+  // inside that directory to prevent any path traversal.
+  const baseDir = path.resolve('/reports');
+  const resolvedFiles = [];
+  for (const file of files) {
+    const resolved = path.resolve(baseDir, file);
+    if (!resolved.startsWith(baseDir + path.sep) && resolved !== baseDir) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    resolvedFiles.push({ resolved, name: file });
   }
 
   // Use archiver library to create tar.gz — no shell command execution at all
@@ -63,15 +76,14 @@ router.post('/compress', (req, res) => {
     res.download(outputPath);
   });
 
-  archive.on('error', (err) => {
+  archive.on('error', () => {
     res.status(500).json({ error: 'Failed to create archive' });
   });
 
   archive.pipe(output);
 
-  for (const file of files) {
-    const filePath = path.join('/reports', file);
-    archive.file(filePath, { name: file });
+  for (const { resolved, name } of resolvedFiles) {
+    archive.file(resolved, { name });
   }
 
   archive.finalize();

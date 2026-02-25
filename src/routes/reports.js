@@ -28,10 +28,14 @@ router.get('/download', (req, res) => {
   if (!filename || typeof filename !== 'string') {
     return res.status(400).json({ error: 'Missing file parameter' });
   }
-  if (filename.includes('..') || path.isAbsolute(filename)) {
+  if (filename.includes('..')) {
     return res.status(403).json({ error: 'Access denied' });
   }
-  const filePath = path.join('/reports', filename);
+  if (path.isAbsolute(filename)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  const safeName = path.basename(filename);
+  const filePath = path.join('/reports', safeName);
   res.sendFile(filePath);
 });
 
@@ -41,10 +45,14 @@ router.get('/view', (req, res) => {
   if (!reportPath || typeof reportPath !== 'string') {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
-  if (reportPath.includes('..') || path.isAbsolute(reportPath)) {
+  if (reportPath.includes('..')) {
     return res.status(403).json({ error: 'Access denied' });
   }
-  const safePath = path.join('/reports', reportPath);
+  if (path.isAbsolute(reportPath)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  const safeName = path.basename(reportPath);
+  const safePath = path.join('/reports', safeName);
   const content = fs.readFileSync(safePath, 'utf-8');
   res.json({ content });
 });

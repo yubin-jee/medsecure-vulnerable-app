@@ -44,14 +44,37 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// VULN: Server-Side Request Forgery (CWE-918)
-const http = require('http');
+// FIX: Server-Side Request Forgery (CWE-918) - use allowlisted URLs only
+const https = require('https');
+
+// Map of allowed source keys to their full URLs. No user input is used in the request URL.
+const ALLOWED_EXTERNAL_URLS = {
+  'patient-records': 'https://api.medsecure.example.com/patient-records',
+  'lab-results': 'https://data.medsecure.example.com/lab-results',
+  'billing-summary': 'https://reports.medsecure.example.com/billing-summary',
+};
+
 router.get('/fetch-external', (req, res) => {
-  const url = req.query.url;
-  http.get(url, (response) => {
+  const source = req.query.source;
+
+  if (!source || typeof source !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid source parameter' });
+  }
+
+  // Look up the fully-qualified URL from the allowlist; user input selects a key, not a URL
+  const targetUrl = ALLOWED_EXTERNAL_URLS[source];
+  if (!targetUrl) {
+    return res.status(403).json({
+      error: 'Unknown source. Allowed sources: ' + Object.keys(ALLOWED_EXTERNAL_URLS).join(', ')
+    });
+  }
+
+  https.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));
+  }).on('error', (err) => {
+    res.status(500).json({ error: 'Failed to fetch external resource' });
   });
 });
 

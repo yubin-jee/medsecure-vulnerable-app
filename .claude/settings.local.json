@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.ama-assn.org)",
+      "WebFetch(domain:www.hipaajournal.com)",
+      "WebFetch(domain:hitrustalliance.net)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:compliancy-group.com)",
+      "WebFetch(domain:www.securitymagazine.com)",
+      "WebFetch(domain:ocrportal.hhs.gov)",
+      "WebFetch(domain:www.federalregister.gov)",
+      "WebFetch(domain:www.healthit.gov)",
+      "WebFetch(domain:www.law.cornell.edu)",
+      "WebFetch(domain:www.cisa.gov)",
+      "WebFetch(domain:www.techtarget.com)",
+      "WebFetch(domain:www.cms.gov)",
+      "WebFetch(domain:www.varonis.com)",
+      "WebFetch(domain:www.pcisecuritystandards.org)",
+      "WebFetch(domain:csrc.nist.gov)",
+      "WebFetch(domain:www.natlawreview.com)",
+      "WebFetch(domain:www.upguard.com)",
+      "WebFetch(domain:reciprocity.com)",
+      "WebFetch(domain:www.aha.org)",
+      "WebFetch(domain:blog.rsisecurity.com)",
+      "WebFetch(domain:securityintelligence.com)",
+      "WebFetch(domain:digitalguardian.com)",
+      "WebFetch(domain:www.strongdm.com)",
+      "Bash(python3:*)"
+    ]
+  }
+}

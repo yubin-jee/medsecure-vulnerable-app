@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureFlow</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-0: #0d1117;
+            --bg-1: #161b22;
+            --bg-2: #1c2128;
+            --bg-3: #21262d;
+            --border: #30363d;
+            --text-0: #e6edf3;
+            --text-1: #c9d1d9;
+            --text-2: #8b949e;
+            --blue: #58a6ff;
+            --green: #3fb950;
+            --red: #f85149;
+            --orange: #d29922;
+            --yellow: #e3b341;
+            --purple: #bc8cff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-0);
+            color: var(--text-0);
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        /* Header */
+        .topbar {
+            background: var(--bg-1);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .topbar h1 { font-size: 16px; font-weight: 600; }
+        .topbar .right { font-size: 12px; color: var(--text-2); }
+        .topbar .right a { color: var(--blue); text-decoration: none; margin-left: 8px; }
+
+        /* Container */
+        .wrap { max-width: 1360px; margin: 0 auto; padding: 20px 32px; }
+
+        /* Metric row */
+        .metrics-5 {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .metric {
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .metric .lbl {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-2);
+            margin-bottom: 4px;
+        }
+        .metric .num { font-size: 28px; font-weight: 700; }
+        .metric .hint { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+        .c-red .num { color: var(--red); }
+        .c-orange .num { color: var(--orange); }
+        .c-blue .num { color: var(--blue); }
+        .c-green .num { color: var(--green); }
+        .c-purple .num { color: var(--purple); }
+
+        /* Cards */
+        .row { display: grid; gap: 16px; margin-bottom: 16px; }
+        .row-2 { grid-template-columns: 3fr 2fr; }
+        .card {
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .card-hd {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-hd .sub { font-weight: 400; color: var(--text-2); font-size: 12px; }
+        .card-bd { padding: 16px; }
+
+        /* Chart */
+        .chart-wrap { position: relative; height: 220px; }
+
+        /* Severity bars */
+        .sev-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .sev-row:last-child { margin-bottom: 0; }
+        .sev-lbl { width: 60px; font-size: 11px; text-transform: uppercase; font-weight: 700; }
+        .sev-track { flex: 1; height: 20px; background: var(--bg-0); border-radius: 3px; overflow: hidden; }
+        .sev-fill {
+            height: 100%;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            padding-left: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            min-width: 24px;
+        }
+        .sev-crit .sev-lbl { color: var(--red); }
+        .sev-crit .sev-fill { background: var(--red); }
+        .sev-high .sev-lbl { color: var(--orange); }
+        .sev-high .sev-fill { background: var(--orange); }
+        .sev-med .sev-lbl { color: var(--yellow); }
+        .sev-med .sev-fill { background: var(--yellow); color: #000; }
+        .sev-low .sev-lbl { color: var(--text-2); }
+        .sev-low .sev-fill { background: var(--text-2); }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--text-2);
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+        tr:last-child td { border-bottom: none; }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+        .b-run { background: rgba(88,166,255,.12); color: var(--blue); }
+        .b-run::before { animation: blink 1.4s infinite; }
+        .b-done { background: rgba(63,185,80,.12); color: var(--green); }
+        .b-fail { background: rgba(248,81,73,.12); color: var(--red); }
+        .b-wait { background: rgba(188,140,255,.1); color: var(--purple); }
+        .b-warn { background: rgba(210,153,34,.12); color: var(--orange); }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+        .sev-tag {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .sev-tag.critical { color: var(--red); }
+        .sev-tag.high { color: var(--orange); }
+        .sev-tag.medium { color: var(--yellow); }
+        .sev-tag.low { color: var(--text-2); }
+
+        a { color: var(--blue); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .empty { text-align: center; padding: 32px; color: var(--text-2); }
+
+        /* Action banner */
+        .action-card { border-color: var(--orange); }
+        .action-card .card-hd { background: rgba(210,153,34,.06); color: var(--orange); }
+        .action-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .action-row:last-child { border-bottom: none; }
+        .action-row .links a { margin-left: 12px; font-size: 12px; }
+
+        /* Vuln list in sidebar */
+        .vuln-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+        }
+        .vuln-row:last-child { border-bottom: none; }
+        .vuln-row .cnt { color: var(--text-2); }
+
+        /* Section divider */
+        .section-divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 24px 0;
+        }
+        .section-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-2);
+            margin-bottom: 14px;
+        }
+
+        /* Business impact card */
+        .impact-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .impact-metric {
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            text-align: center;
+        }
+        .impact-metric .im-num { font-size: 28px; font-weight: 700; }
+        .impact-metric .im-lbl {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-2);
+            margin-bottom: 4px;
+        }
+        .impact-metric .im-sub {
+            font-size: 10px;
+            color: var(--text-2);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+        .impact-metric .im-compare {
+            font-size: 11px;
+            color: var(--text-2);
+            margin-top: 6px;
+        }
+        .impact-metric .im-compare span { color: var(--text-1); }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>SecureFlow</h1>
+        <div class="right">
+            Last run: {{ last_run or "Never" }}
+            <a href="#" onclick="location.reload()">Refresh</a>
+        </div>
+    </div>
+
+    <div class="wrap">
+
+        <!-- Pipeline Status -->
+        <div class="section-label">Remediation Pipeline</div>
+        <div class="metrics-5">
+            <div class="metric">
+                <div class="lbl">Detected</div>
+                <div class="num">{{ pipeline_stages.detected }}</div>
+                <div class="hint">awaiting assignment</div>
+            </div>
+            <div class="metric c-blue">
+                <div class="lbl">Devin Working</div>
+                <div class="num">{{ pipeline_stages.devin_working }}</div>
+                <div class="hint">active sessions</div>
+            </div>
+            <div class="metric c-purple">
+                <div class="lbl">PR Created</div>
+                <div class="num">{{ pipeline_stages.pr_created }}</div>
+                <div class="hint">awaiting review</div>
+            </div>
+            <div class="metric c-orange">
+                <div class="lbl">Engineer Review</div>
+                <div class="num">{{ pipeline_stages.engineer_review }}</div>
+                <div class="hint">needs human judgment</div>
+            </div>
+            <div class="metric c-green">
+                <div class="lbl">Resolved</div>
+                <div class="num">{{ pipeline_stages.resolved }}</div>
+                <div class="hint">merged &amp; closed</div>
+            </div>
+        </div>
+
+        <!-- Business Impact -->
+        <div class="impact-metrics">
+            <div class="impact-metric">
+                <div class="im-lbl">HIPAA Risk Exposure</div>
+                <div class="im-num" style="color: var(--red);">
+                    ${{ "{:,.0f}".format(business_impact.hipaa_exposure) }}
+                </div>
+                <div class="im-sub">potential fines for unpatched known vulnerabilities</div>
+                <div class="im-sub" style="margin-top: 6px; font-style: italic;">
+                    Based on HIPAA Tier 3/4 penalty schedules (HITECH Act)
+                </div>
+            </div>
+            <div class="impact-metric">
+                <div class="im-lbl">Mean Time to Fix</div>
+                {% if business_impact.mttr_minutes is not none %}
+                <div class="im-num" style="color: var(--green);">
+                    ~{{ business_impact.mttr_minutes }} min
+                </div>
+                {% else %}
+                <div class="im-num" style="color: var(--text-2);">&mdash;</div>
+                {% endif %}
+                <div class="im-compare">
+                    Industry avg: <span>{{ business_impact.industry_mttr_days }} days</span>
+                </div>
+                <div class="im-sub">Devin resolves vulnerabilities in minutes, not weeks</div>
+            </div>
+            <div class="impact-metric">
+                <div class="im-lbl">Breach Risk Reduced</div>
+                <div class="im-num" style="color: var(--green);">
+                    ${{ "{:,.0f}".format(business_impact.risk_reduced) }}
+                </div>
+                <div class="im-sub">
+                    {{ business_impact.resolved_alerts }} vulnerabilities eliminated
+                </div>
+                <div class="im-sub" style="margin-top: 6px; font-style: italic;">
+                    Based on IBM 2024 Healthcare Breach Report ($408/record)
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Divider -->
+        <hr class="section-divider">
+        <div class="section-label">Operations</div>
+
+        <!-- Action items -->
+        {% set needs_action = [] %}
+        {% for s in sessions %}
+            {% if s.status == 'review_ready' %}
+                {% if needs_action.append(s) %}{% endif %}
+            {% elif s.status == 'needs_human_review' %}
+                {% if needs_action.append(s) %}{% endif %}
+            {% elif s.status == 'failed' %}
+                {% if needs_action.append(s) %}{% endif %}
+            {% elif s.status == 'finished' and s.pr_url %}
+                {% if needs_action.append(s) %}{% endif %}
+            {% endif %}
+        {% endfor %}
+        {% if needs_action %}
+        <div class="card action-card" style="margin-bottom: 16px;">
+            <div class="card-hd">
+                Action Required
+                <span class="sub" style="color: var(--orange);">{{ needs_action | length }} item(s)</span>
+            </div>
+            <div class="card-bd">
+                {% for s in needs_action %}
+                <div class="action-row">
+                    <div>
+                        {% if s.status == 'review_ready' %}
+                        <span class="badge b-done">ready to merge</span>
+                        {% elif s.status == 'needs_human_review' %}
+                        <span class="badge b-warn">needs review</span>
+                        {% elif s.status == 'finished' %}
+                        <span class="badge b-done">PR ready</span>
+                        {% else %}
+                        <span class="badge b-fail">failed</span>
+                        {% endif %}
+                        <span style="margin-left: 6px;">
+                            {{ s.get('description', '') or s.batch_id }}
+                        </span>
+                    </div>
+                    <div class="links">
+                        {% if s.pr_url %}<a href="{{ s.pr_url }}" target="_blank">Review PR</a>{% endif %}
+                        {% if s.url %}<a href="{{ s.url }}" target="_blank">Devin</a>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Chart + Severity -->
+        <div class="row row-2">
+            <div class="card">
+                <div class="card-hd">
+                    Burndown
+                    <span class="sub">Open alerts over time</span>
+                </div>
+                <div class="card-bd">
+                    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-hd">Severity</div>
+                <div class="card-bd">
+                    {% set mx = [alert_summary.by_severity.critical, alert_summary.by_severity.high, alert_summary.by_severity.medium, alert_summary.by_severity.low] | max %}
+                    {% set mx = mx if mx > 0 else 1 %}
+                    <div class="sev-row sev-crit">
+                        <div class="sev-lbl">Critical</div>
+                        <div class="sev-track"><div class="sev-fill" style="width:{{ (alert_summary.by_severity.critical / mx * 100)|int }}%">{{ alert_summary.by_severity.critical }}</div></div>
+                    </div>
+                    <div class="sev-row sev-high">
+                        <div class="sev-lbl">High</div>
+                        <div class="sev-track"><div class="sev-fill" style="width:{{ (alert_summary.by_severity.high / mx * 100)|int }}%">{{ alert_summary.by_severity.high }}</div></div>
+                    </div>
+                    <div class="sev-row sev-med">
+                        <div class="sev-lbl">Medium</div>
+                        <div class="sev-track"><div class="sev-fill" style="width:{{ (alert_summary.by_severity.medium / mx * 100)|int }}%">{{ alert_summary.by_severity.medium }}</div></div>
+                    </div>
+                    <div class="sev-row sev-low">
+                        <div class="sev-lbl">Low</div>
+                        <div class="sev-track"><div class="sev-fill" style="width:{{ (alert_summary.by_severity.low / mx * 100)|int }}%">{{ alert_summary.by_severity.low }}</div></div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <div style="font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px;">Top Categories</div>
+                        {% for rule, count in alert_summary.by_rule | dictsort(by='value', reverse=true) %}
+                        {% if loop.index <= 5 %}
+                        <div class="vuln-row">
+                            <span>{{ rule }}</span>
+                            <span class="cnt">{{ count }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sessions -->
+        <div class="card" style="margin-bottom: 16px;">
+            <div class="card-hd">
+                Remediation Sessions
+                <span class="sub">
+                    {{ session_summary.total }} total
+                    | {{ session_summary.running }} active
+                    | {{ session_summary.finished }} done
+                </span>
+            </div>
+            <div class="card-bd" style="padding: 0;">
+                {% if sessions %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>What</th>
+                            <th>Severity</th>
+                            <th>File</th>
+                            <th>Alerts</th>
+                            <th>Status</th>
+                            <th>PR</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in sessions %}
+                        <tr>
+                            <td>
+                                <strong>{{ s.get('category', '') or s.batch_id }}</strong>
+                                {% if s.get('description') %}
+                                <div style="font-size: 11px; color: var(--text-2); margin-top: 2px;">
+                                    {{ s.description[:80] }}{% if s.description|length > 80 %}...{% endif %}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="sev-tag {{ s.get('severity', 'medium') }}">{{ s.get('severity', '?') }}</span>
+                            </td>
+                            <td style="font-family: monospace; font-size: 12px; color: var(--text-1);">
+                                {{ s.get('file_path', '') }}
+                            </td>
+                            <td>
+                                {{ s.alert_numbers | length }}
+                            </td>
+                            <td>
+                                {% if s.status in ('running', 'working') %}
+                                <span class="badge b-run">running</span>
+                                {% elif s.status == 'finished' %}
+                                <span class="badge b-done">done</span>
+                                {% elif s.status == 'review_ready' %}
+                                <span class="badge b-done">review ready</span>
+                                {% elif s.status == 'merged' %}
+                                <span class="badge b-done">merged</span>
+                                {% elif s.status == 'needs_human_review' %}
+                                <span class="badge b-warn">needs review</span>
+                                {% elif s.status == 'failed' %}
+                                <span class="badge b-fail">failed</span>
+                                {% elif s.status == 'blocked' %}
+                                <span class="badge b-warn">blocked</span>
+                                {% else %}
+                                <span class="badge b-wait">{{ s.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if s.pr_url %}
+                                <a href="{{ s.pr_url }}" target="_blank">PR #{{ s.pr_url.split('/')[-1] }}</a>
+                                {% else %}
+                                <span style="color: var(--text-2);">&mdash;</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if s.url %}
+                                <a href="{{ s.url }}" target="_blank" style="font-size: 12px;">Devin</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty">No sessions yet. Run the orchestrator to begin.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Queue -->
+        {% if queued_batches %}
+        <div class="card">
+            <div class="card-hd">
+                Queue
+                <span class="sub">{{ queued_batches | length }} batches waiting | max {{ max_concurrent }} concurrent</span>
+            </div>
+            <div class="card-bd" style="padding: 0;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vulnerability</th>
+                            <th>Severity</th>
+                            <th>File</th>
+                            <th>Alerts</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in queued_batches %}
+                        <tr>
+                            <td>{{ b.category }}</td>
+                            <td><span class="sev-tag {{ b.severity }}">{{ b.severity }}</span></td>
+                            <td style="font-family: monospace; font-size: 12px; color: var(--text-1);">{{ b.file_path }}</td>
+                            <td>{{ b.alert_count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        const hist = {{ history | tojson }};
+        const labels = hist.length
+            ? hist.map(h => new Date(h.timestamp).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}))
+            : ['Start','','','','Target'];
+        const open = hist.length ? hist.map(h=>h.total_open) : [{{ alert_summary.total }},null,null,null,0];
+        const fixed = hist.length ? hist.map(h=>h.fixed) : [0,null,null,null,{{ alert_summary.total }}];
+
+        new Chart(document.getElementById('chart'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    { label:'Open', data:open, borderColor:'#f85149', backgroundColor:'rgba(248,81,73,.08)', fill:true, tension:.3, pointRadius:3, pointBackgroundColor:'#f85149' },
+                    { label:'Fixed', data:fixed, borderColor:'#3fb950', backgroundColor:'rgba(63,185,80,.08)', fill:true, tension:.3, pointRadius:3, pointBackgroundColor:'#3fb950' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { labels: { color:'#8b949e', font:{size:11} } } },
+                scales: {
+                    x: { grid:{color:'rgba(48,54,61,.4)'}, ticks:{color:'#8b949e', font:{size:11}} },
+                    y: { grid:{color:'rgba(48,54,61,.4)'}, ticks:{color:'#8b949e', font:{size:11}}, beginAtZero:true }
+                }
+            }
+        });
+
+        setTimeout(()=>location.reload(), 30000);
+    </script>
+</body>
+</html>

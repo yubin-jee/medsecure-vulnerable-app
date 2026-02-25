@@ -1,0 +1,218 @@
+{
+  "sessions": [
+    {
+      "session_id": "devin-009b3e63559041109878bfbf7509fe66",
+      "batch_id": "batch-003",
+      "alert_numbers": [
+        39
+      ],
+      "status": "finished",
+      "url": "https://app.devin.ai/sessions/009b3e63559041109878bfbf7509fe66",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/10",
+      "created_at": "2026-02-25T17:24:53.910495",
+      "updated_at": "2026-02-25T18:05:18.695982Z",
+      "error": null
+    },
+    {
+      "session_id": "devin-a7a2ad62fc134d72b295a453efb832ac",
+      "batch_id": "batch-005",
+      "alert_numbers": [
+        37
+      ],
+      "status": "merged",
+      "url": "https://app.devin.ai/sessions/a7a2ad62fc134d72b295a453efb832ac",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/9",
+      "created_at": "2026-02-25T17:24:59.932663",
+      "updated_at": "2026-02-25T18:00:35.059546Z",
+      "error": null
+    },
+    {
+      "session_id": "devin-08b98e0c7f384c968a7542599456efbf",
+      "batch_id": "batch-012",
+      "alert_numbers": [
+        21,
+        20,
+        19
+      ],
+      "status": "review_ready",
+      "url": "https://app.devin.ai/sessions/08b98e0c7f384c968a7542599456efbf",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/8",
+      "created_at": "2026-02-25T17:25:01.223093",
+      "updated_at": "2026-02-25T18:30:33.265699Z",
+      "error": null
+    }
+  ],
+  "processed_alerts": [
+    39,
+    37,
+    21,
+    20,
+    19
+  ],
+  "notified_sessions": [
+    "devin-009b3e63559041109878bfbf7509fe66",
+    "devin-a7a2ad62fc134d72b295a453efb832ac"
+  ],
+  "verified_sessions": [
+    "devin-009b3e63559041109878bfbf7509fe66",
+    "devin-a7a2ad62fc134d72b295a453efb832ac",
+    "devin-08b98e0c7f384c968a7542599456efbf"
+  ],
+  "batch_info": {
+    "batch-003": {
+      "description": "js/sensitive-get-query in src/routes/patients.js:15 \u2014 Route handler for GET requests uses query parameter as sensitive data.",
+      "severity": "medium",
+      "category": "js/sensitive-get-query",
+      "file_path": "src/routes/patients.js",
+      "alert_count": 1
+    },
+    "batch-005": {
+      "description": "2 js/path-injection issues in src/routes/reports.js at lines 29, 35",
+      "severity": "high",
+      "category": "Path Traversal",
+      "file_path": "src/routes/reports.js",
+      "alert_count": 2
+    },
+    "batch-012": {
+      "description": "5 js/missing-rate-limiting issues in src/routes/reports.js at lines 8, 15, 26, 33, 40",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/reports.js",
+      "alert_count": 5
+    },
+    "batch-002": {
+      "description": "js/remote-property-injection in src/routes/admin.js:59 \u2014 A property name to write to depends on a user-provided value.",
+      "severity": "high",
+      "category": "js/remote-property-injection",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-007": {
+      "description": "3 js/sql-injection issues in src/routes/auth.js at lines 16, 43, 57",
+      "severity": "high",
+      "category": "SQL Injection",
+      "file_path": "src/routes/auth.js",
+      "alert_count": 3
+    },
+    "batch-008": {
+      "description": "js/sql-injection in src/routes/api.js:16 \u2014 This query string depends on a user-provided value.\nThis query string depends on a user-provided val",
+      "severity": "high",
+      "category": "SQL Injection",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-009": {
+      "description": "2 js/reflected-xss issues in src/routes/admin.js at lines 8, 33",
+      "severity": "high",
+      "category": "Cross-Site Scripting (XSS)",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 2
+    },
+    "batch-010": {
+      "description": "js/server-side-unvalidated-url-redirection in src/routes/admin.js:41 \u2014 Untrusted URL redirection depends on a user-provided value.",
+      "severity": "medium",
+      "category": "js/server-side-unvalidated-url-redirection",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-011": {
+      "description": "js/insufficient-key-size in src/routes/api.js:38 \u2014 Creation of an asymmetric RSA key uses 512 bits, which is below 2048 and considered breakable.",
+      "severity": "high",
+      "category": "Insufficient Key Size",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-014": {
+      "description": "4 js/missing-rate-limiting issues in src/routes/auth.js at lines 13, 38, 49, 55",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/auth.js",
+      "alert_count": 4
+    },
+    "batch-015": {
+      "description": "js/missing-rate-limiting in src/routes/api.js:7 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-016": {
+      "description": "js/missing-rate-limiting in src/routes/admin.js:19 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-017": {
+      "description": "4 js/missing-rate-limiting issues in src/routes/auth.js at lines 13, 38, 49, 55",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/auth.js",
+      "alert_count": 4
+    },
+    "batch-018": {
+      "description": "js/missing-rate-limiting in src/routes/api.js:7 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-019": {
+      "description": "js/missing-rate-limiting in src/routes/admin.js:19 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-001": {
+      "description": "js/log-injection in src/routes/api.js:31 \u2014 Log entry depends on a user-provided value.",
+      "severity": "medium",
+      "category": "js/log-injection",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-004": {
+      "description": "js/clear-text-cookie in src/app.js:19 \u2014 Sensitive cookie sent without enforcing SSL encryption.",
+      "severity": "medium",
+      "category": "js/clear-text-cookie",
+      "file_path": "src/app.js",
+      "alert_count": 1
+    },
+    "batch-006": {
+      "description": "6 js/sql-injection issues in src/routes/patients.js at lines 9, 17, 28, 37, 44 (+1 more)",
+      "severity": "high",
+      "category": "SQL Injection",
+      "file_path": "src/routes/patients.js",
+      "alert_count": 6
+    },
+    "batch-013": {
+      "description": "5 js/missing-rate-limiting issues in src/routes/patients.js at lines 6, 14, 25, 33, 42",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/patients.js",
+      "alert_count": 5
+    }
+  },
+  "history": [
+    {
+      "timestamp": "2026-02-25T17:25:05.180382",
+      "total_open": 41,
+      "fixed": 0,
+      "in_progress": 3
+    },
+    {
+      "timestamp": "2026-02-25T17:56:39.358427",
+      "total_open": 41,
+      "fixed": 0,
+      "in_progress": 1
+    },
+    {
+      "timestamp": "2026-02-25T18:32:12.333127",
+      "total_open": 41,
+      "fixed": 2,
+      "in_progress": 0
+    }
+  ],
+  "last_run": "2026-02-25T19:20:36.559903",
+  "initial_scan_sent": true
+}

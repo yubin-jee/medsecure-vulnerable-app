@@ -3,7 +3,6 @@ const router = express.Router();
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const sanitize = require('sanitize-filename');
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -23,25 +22,19 @@ router.post('/export', (req, res) => {
   });
 });
 
-// FIX: Path traversal (CWE-22) - sanitize filename to strip directory traversal characters
+// FIX: Path traversal (CWE-22) - sanitize filename with path.basename to strip directory components
 router.get('/download', (req, res) => {
-  const filename = sanitize(req.query.file);
-  if (!filename) {
-    return res.status(400).json({ error: 'Invalid file name' });
-  }
-  const filePath = path.join('/reports', filename);
-  const content = fs.readFileSync(filePath);
-  res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
-  res.send(content);
+  const filename = req.query.file;
+  const sanitizedFilename = path.basename(filename);
+  const filePath = path.join('/reports', sanitizedFilename);
+  res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - sanitize path to strip directory traversal characters
+// FIX: Path traversal (CWE-22) - sanitize path with path.basename to strip directory components
 router.get('/view', (req, res) => {
-  const reportPath = sanitize(req.query.path);
-  if (!reportPath) {
-    return res.status(400).json({ error: 'Invalid file path' });
-  }
-  const resolvedPath = path.join('/reports', reportPath);
+  const reportPath = req.query.path;
+  const sanitizedPath = path.basename(reportPath);
+  const resolvedPath = path.join('/reports', sanitizedPath);
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });

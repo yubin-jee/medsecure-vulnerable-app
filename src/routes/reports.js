@@ -44,40 +44,43 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowed hostnames
+// FIX: Server-Side Request Forgery (CWE-918) - use allowlisted resource map
+// instead of passing user-controlled URLs to http.get
 const http = require('http');
 const https = require('https');
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'reports.example.com',
-  'data.example.com'
-];
+
+// Map of allowed resource keys to their full URLs.
+// No user input flows into the URL — the user selects a key, and the
+// corresponding constant URL is fetched.
+const ALLOWED_RESOURCES = {
+  'api-data': 'https://api.example.com/data',
+  'reports-summary': 'https://reports.example.com/summary',
+  'data-stats': 'https://data.example.com/stats'
+};
 
 router.get('/fetch-external', (req, res) => {
-  const rawUrl = req.query.url;
-  if (!rawUrl) {
-    return res.status(400).json({ error: 'URL parameter is required' });
+  const resourceKey = req.query.resource;
+  if (!resourceKey) {
+    return res.status(400).json({
+      error: 'Resource parameter is required',
+      allowed: Object.keys(ALLOWED_RESOURCES)
+    });
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(rawUrl);
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid URL format' });
+  // Only allow keys that exist in the constant map (prevents SSRF)
+  if (!Object.prototype.hasOwnProperty.call(ALLOWED_RESOURCES, resourceKey)) {
+    return res.status(403).json({
+      error: 'Unknown resource key',
+      allowed: Object.keys(ALLOWED_RESOURCES)
+    });
   }
 
-  // Only allow http and https protocols
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http and https protocols are allowed' });
-  }
-
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
-    return res.status(403).json({ error: 'Requested host is not in the allowed list' });
-  }
-
+  // URL comes entirely from the constant map — no user input in the URL
+  const targetUrl = ALLOWED_RESOURCES[resourceKey];
+  const parsedUrl = new URL(targetUrl);
   const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl.href, (response) => {
+
+  client.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

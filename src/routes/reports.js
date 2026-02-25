@@ -10,29 +10,39 @@ const ALLOWED_REPORT_TYPES = ['summary', 'detailed', 'audit', 'compliance', 'pat
 // Allowlist of valid export formats
 const ALLOWED_FORMATS = ['pdf', 'csv', 'json', 'xml', 'html'];
 
-// Validate that a value contains only safe characters (alphanumeric, hyphens, underscores, dots)
-function isSafeFilename(value) {
-  return /^[a-zA-Z0-9._-]+$/.test(value);
+// Extract a sanitized filename containing only safe characters (alphanumeric, hyphens, underscores, dots)
+// Returns the sanitized string or null if the value is invalid
+function sanitizeFilename(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^[a-zA-Z0-9._-]+$/);
+  return match ? match[0] : null;
 }
 
 router.get('/generate', (req, res) => {
   const reportType = req.query.type;
-  if (!ALLOWED_REPORT_TYPES.includes(reportType)) {
+  const typeIndex = ALLOWED_REPORT_TYPES.indexOf(reportType);
+  if (typeIndex === -1) {
     return res.status(400).json({ error: 'Invalid report type' });
   }
-  const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
+  // Use the allowlisted value to avoid passing tainted data to the command
+  const safeType = ALLOWED_REPORT_TYPES[typeIndex];
+  const output = execFileSync('generate-report', ['--type', safeType, '--format', 'pdf']);
   res.send(output);
 });
 
 router.post('/export', (req, res) => {
   const { filename, format } = req.body;
-  if (!filename || !isSafeFilename(filename)) {
+  const safeFilename = sanitizeFilename(filename);
+  if (!safeFilename) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
-  if (!ALLOWED_FORMATS.includes(format)) {
+  const formatIndex = ALLOWED_FORMATS.indexOf(format);
+  if (formatIndex === -1) {
     return res.status(400).json({ error: 'Invalid format' });
   }
-  execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
+  // Use sanitized/allowlisted values to avoid passing tainted data to the command
+  const safeFormat = ALLOWED_FORMATS[formatIndex];
+  execFile('convert-data', [safeFilename, '--output-format', safeFormat], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -59,11 +69,16 @@ router.post('/compress', (req, res) => {
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'Files must be a non-empty array' });
   }
-  const invalidFiles = files.filter((f) => !isSafeFilename(f));
-  if (invalidFiles.length > 0) {
-    return res.status(400).json({ error: 'Invalid filename(s) detected' });
+  // Sanitize each filename to produce new untainted values
+  const safeFiles = [];
+  for (const f of files) {
+    const safe = sanitizeFilename(f);
+    if (!safe) {
+      return res.status(400).json({ error: 'Invalid filename(s) detected' });
+    }
+    safeFiles.push(safe);
   }
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...safeFiles]);
   res.download('/tmp/archive.tar.gz');
 });
 

@@ -3,6 +3,13 @@ const router = express.Router();
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+
+const viewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -31,7 +38,8 @@ router.get('/download', (req, res) => {
 });
 
 // FIX: Path traversal (CWE-22) - sanitize path with path.basename to strip directory components
-router.get('/view', (req, res) => {
+// FIX: Missing rate limiting (CWE-770) - add rate limiter to prevent DoS via filesystem access
+router.get('/view', viewLimiter, (req, res) => {
   const reportPath = req.query.path;
   const sanitizedPath = path.basename(reportPath);
   const resolvedPath = path.join('/reports', sanitizedPath);

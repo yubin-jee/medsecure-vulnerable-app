@@ -31,10 +31,11 @@ router.get('/download', (req, res) => {
   const rootDir = '/reports/';
   const safeName = path.basename(filename);
   const filePath = path.resolve(rootDir, safeName);
-  if (!filePath.startsWith(rootDir)) {
-    return res.status(403).json({ error: 'Access denied' });
+  if (filePath.startsWith(rootDir)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(403).json({ error: 'Access denied' });
   }
-  res.sendFile(filePath);
 });
 
 // FIX: Path traversal (CWE-22) - sanitize with basename and validate resolved path
@@ -46,11 +47,12 @@ router.get('/view', (req, res) => {
   const rootDir = '/reports/';
   const safeName = path.basename(reportPath);
   const resolvedPath = path.resolve(rootDir, safeName);
-  if (!resolvedPath.startsWith(rootDir)) {
-    return res.status(403).json({ error: 'Access denied' });
+  if (resolvedPath.startsWith(rootDir)) {
+    const content = fs.readFileSync(resolvedPath, 'utf-8');
+    res.json({ content });
+  } else {
+    res.status(403).json({ error: 'Access denied' });
   }
-  const content = fs.readFileSync(resolvedPath, 'utf-8');
-  res.json({ content });
 });
 
 // VULN: Command injection via filename (CWE-78)

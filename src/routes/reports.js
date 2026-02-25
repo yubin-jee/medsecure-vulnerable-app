@@ -22,39 +22,35 @@ router.post('/export', (req, res) => {
   });
 });
 
-// FIX: Path traversal (CWE-22) - reject traversal sequences and absolute paths
+// FIX: Path traversal (CWE-22) - normalize and validate path stays within root
 router.get('/download', (req, res) => {
   const filename = req.query.file;
   if (!filename || typeof filename !== 'string') {
     return res.status(400).json({ error: 'Missing file parameter' });
   }
-  if (filename.includes('..')) {
-    return res.status(403).json({ error: 'Access denied' });
+  const rootDir = '/reports/';
+  const filePath = path.resolve(rootDir, filename);
+  if (filePath.startsWith(rootDir)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(403).json({ error: 'Access denied' });
   }
-  if (path.isAbsolute(filename)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  const safeName = path.basename(filename);
-  const filePath = path.join('/reports', safeName);
-  res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - reject traversal sequences and absolute paths
+// FIX: Path traversal (CWE-22) - normalize and validate path stays within root
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
   if (!reportPath || typeof reportPath !== 'string') {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
-  if (reportPath.includes('..')) {
-    return res.status(403).json({ error: 'Access denied' });
+  const rootDir = '/reports/';
+  const resolvedPath = path.resolve(rootDir, reportPath);
+  if (resolvedPath.startsWith(rootDir)) {
+    const content = fs.readFileSync(resolvedPath, 'utf-8');
+    res.json({ content });
+  } else {
+    res.status(403).json({ error: 'Access denied' });
   }
-  if (path.isAbsolute(reportPath)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  const safeName = path.basename(reportPath);
-  const safePath = path.join('/reports', safeName);
-  const content = fs.readFileSync(safePath, 'utf-8');
-  res.json({ content });
 });
 
 // VULN: Command injection via filename (CWE-78)

@@ -22,26 +22,34 @@ router.post('/export', (req, res) => {
   });
 });
 
-// FIX: Path traversal (CWE-22) - sanitize filename with path.basename()
+// FIX: Path traversal (CWE-22) - sanitize with basename and validate resolved path
 router.get('/download', (req, res) => {
   const filename = req.query.file;
-  if (!filename) {
+  if (!filename || typeof filename !== 'string') {
     return res.status(400).json({ error: 'Missing file parameter' });
   }
-  const sanitizedFilename = path.basename(filename);
-  const filePath = path.join('/reports', sanitizedFilename);
+  const rootDir = '/reports/';
+  const safeName = path.basename(filename);
+  const filePath = path.resolve(rootDir, safeName);
+  if (!filePath.startsWith(rootDir)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - sanitize filename with path.basename()
+// FIX: Path traversal (CWE-22) - sanitize with basename and validate resolved path
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  if (!reportPath) {
+  if (!reportPath || typeof reportPath !== 'string') {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
-  const sanitizedFilename = path.basename(reportPath);
-  const safePath = path.join('/reports', sanitizedFilename);
-  const content = fs.readFileSync(safePath, 'utf-8');
+  const rootDir = '/reports/';
+  const safeName = path.basename(reportPath);
+  const resolvedPath = path.resolve(rootDir, safeName);
+  if (!resolvedPath.startsWith(rootDir)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });
 

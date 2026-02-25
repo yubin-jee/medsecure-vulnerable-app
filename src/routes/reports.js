@@ -3,6 +3,16 @@ const router = express.Router();
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiter for file system access routes
+const fsRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' }
+});
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -31,7 +41,7 @@ router.get('/download', (req, res) => {
 });
 
 // FIX: Path traversal (CWE-22) - normalize path and verify it stays within the reports root
-router.get('/view', (req, res) => {
+router.get('/view', fsRateLimiter, (req, res) => {
   const reportPath = req.query.path;
   const root = path.resolve('/reports');
   const filePath = path.resolve(root, reportPath);

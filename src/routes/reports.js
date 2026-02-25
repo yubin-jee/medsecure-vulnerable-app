@@ -46,25 +46,29 @@ router.post('/compress', (req, res) => {
     return res.status(400).json({ error: 'files must be a non-empty array' });
   }
 
-  // Validate filenames: only allow alphanumeric, hyphens, underscores, and a
-  // single dot for the extension. No path separators or traversal sequences.
-  const safePattern = /^[\w][\w\-]*(\.\w+)?$/;
-  for (const file of files) {
-    if (typeof file !== 'string' || !safePattern.test(file)) {
-      return res.status(400).json({ error: 'Invalid filename' });
-    }
+  // List available files in the reports directory to use as an allowlist.
+  // User input is only used as a lookup key — file paths are derived entirely
+  // from the directory listing (fs.readdirSync), breaking any taint chain.
+  const baseDir = '/reports';
+  let availableFiles;
+  try {
+    availableFiles = fs.readdirSync(baseDir);
+  } catch (err) {
+    return res.status(500).json({ error: 'Reports directory not available' });
   }
 
-  // Resolve each filename against a fixed base directory and verify it stays
-  // inside that directory to prevent any path traversal.
-  const baseDir = path.resolve('/reports');
-  const resolvedFiles = [];
-  for (const file of files) {
-    const resolved = path.resolve(baseDir, file);
-    if (!resolved.startsWith(baseDir + path.sep) && resolved !== baseDir) {
+  const validFiles = [];
+  for (const requestedName of files) {
+    if (typeof requestedName !== 'string') {
       return res.status(400).json({ error: 'Invalid filename' });
     }
-    resolvedFiles.push({ resolved, name: file });
+    // Look up the requested name in the directory listing; use the directory-
+    // listed value (untainted) rather than the user-supplied string.
+    const match = availableFiles.find(f => f === requestedName);
+    if (!match) {
+      return res.status(400).json({ error: 'File not found' });
+    }
+    validFiles.push(match);
   }
 
   // Use archiver library to create tar.gz — no shell command execution at all
@@ -82,8 +86,8 @@ router.post('/compress', (req, res) => {
 
   archive.pipe(output);
 
-  for (const { resolved, name } of resolvedFiles) {
-    archive.file(resolved, { name });
+  for (const name of validFiles) {
+    archive.file(path.join(baseDir, name), { name });
   }
 
   archive.finalize();

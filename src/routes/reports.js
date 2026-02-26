@@ -44,14 +44,62 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// VULN: Server-Side Request Forgery (CWE-918)
+// FIXED: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
 const http = require('http');
+const https = require('https');
+const { URL } = require('url');
+
+const ALLOWED_EXTERNAL_HOSTS = [
+  'api.medsecure.example.com',
+  'data.medsecure.example.com',
+  'reports.medsecure.example.com'
+];
+
+const ALLOWED_PROTOCOLS = ['http:', 'https:'];
+
+function isAllowedUrl(userUrl) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(userUrl);
+  } catch (e) {
+    return { allowed: false, reason: 'Invalid URL' };
+  }
+
+  if (!ALLOWED_PROTOCOLS.includes(parsedUrl.protocol)) {
+    return { allowed: false, reason: 'Protocol not allowed' };
+  }
+
+  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
+    return { allowed: false, reason: 'Hostname not in allowlist' };
+  }
+
+  // Block credentials in URL
+  if (parsedUrl.username || parsedUrl.password) {
+    return { allowed: false, reason: 'Credentials in URL not allowed' };
+  }
+
+  return { allowed: true, parsedUrl };
+}
+
 router.get('/fetch-external', (req, res) => {
-  const url = req.query.url;
-  http.get(url, (response) => {
+  const userUrl = req.query.url;
+
+  if (!userUrl) {
+    return res.status(400).json({ error: 'Missing url parameter' });
+  }
+
+  const validation = isAllowedUrl(userUrl);
+  if (!validation.allowed) {
+    return res.status(403).json({ error: `Forbidden: ${validation.reason}` });
+  }
+
+  const client = validation.parsedUrl.protocol === 'https:' ? https : http;
+  client.get(validation.parsedUrl.href, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));
+  }).on('error', (err) => {
+    res.status(502).json({ error: 'Failed to fetch external resource' });
   });
 });
 

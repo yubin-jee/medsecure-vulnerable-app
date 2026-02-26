@@ -44,54 +44,45 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
+// FIX: Server-Side Request Forgery (CWE-918) - allowlist-based host lookup
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'data.example.com',
-  'reports.example.com',
-];
-
-function isAllowedUrl(userUrl) {
-  let parsed;
-  try {
-    parsed = new URL(userUrl);
-  } catch (e) {
-    return false;
-  }
-
-  // Only allow http and https protocols
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return false;
-  }
-
-  // Reject URLs with credentials
-  if (parsed.username || parsed.password) {
-    return false;
-  }
-
-  // Validate hostname against allowlist
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsed.hostname)) {
-    return false;
-  }
-
-  return true;
-}
+// Map of allowed host keys to their trusted base URLs
+const ALLOWED_HOSTS = {
+  'api': 'https://api.example.com',
+  'data': 'https://data.example.com',
+  'reports': 'https://reports.example.com',
+};
 
 router.get('/fetch-external', (req, res) => {
-  const url = req.query.url;
+  const hostKey = req.query.host;
+  const resourcePath = req.query.path;
 
-  if (!url || !isAllowedUrl(url)) {
-    return res.status(400).json({ error: 'Invalid or disallowed URL. Only approved external hosts are permitted.' });
+  // Look up the base URL from the allowlist using a non-tainted key
+  const baseUrl = ALLOWED_HOSTS[hostKey];
+  if (!baseUrl) {
+    return res.status(400).json({
+      error: 'Invalid host. Allowed hosts: ' + Object.keys(ALLOWED_HOSTS).join(', ')
+    });
   }
 
-  const parsed = new URL(url);
-  const client = parsed.protocol === 'https:' ? https : http;
+  // Sanitize the resource path to prevent path traversal
+  if (resourcePath && (/\.\./.test(resourcePath) || resourcePath.includes('\0'))) {
+    return res.status(400).json({ error: 'Invalid resource path.' });
+  }
 
-  client.get(parsed, (response) => {
+  // Construct URL entirely from trusted base + sanitized path
+  const trustedUrl = new URL(baseUrl);
+  if (resourcePath) {
+    // Normalize and append the path safely
+    trustedUrl.pathname = '/' + resourcePath.replace(/^\/+/, '');
+  }
+
+  const client = trustedUrl.protocol === 'https:' ? https : http;
+
+  client.get(trustedUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

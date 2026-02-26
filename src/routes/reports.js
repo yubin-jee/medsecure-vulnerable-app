@@ -77,8 +77,14 @@ router.get('/fetch-external', (req, res) => {
     return res.status(403).json({ error: 'Requested host is not allowed' });
   }
 
-  const sanitizedUrl = parsedUrl.toString();
-  http.get(sanitizedUrl, (response) => {
+  // Use options object with hostname from allowlist to prevent SSRF
+  const safeHost = ALLOWED_HOSTS.find(h => h === parsedUrl.hostname);
+  const requestOptions = {
+    hostname: safeHost,
+    port: 80,
+    path: parsedUrl.pathname + parsedUrl.search
+  };
+  http.get(requestOptions, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

@@ -55,12 +55,9 @@ router.post('/import-config', (req, res) => {
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = Object.create(null);
-  Object.keys(userSettings).forEach(key => {
-    if (!DANGEROUS_KEYS.has(key)) {
-      settings[key] = userSettings[key];
-    }
-  });
+  const settings = Object.fromEntries(
+    Object.entries(userSettings).filter(([key]) => !DANGEROUS_KEYS.has(key))
+  );
   res.json({ settings });
 });
 

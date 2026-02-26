@@ -12,8 +12,8 @@ const DB_PASSWORD = 'postgres://admin:password123@db.medsecure.internal:5432/pat
 // VULN: SQL Injection in login (CWE-89)
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
-  const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
-  const user = db.prepare(query).get();
+  const query = 'SELECT * FROM users WHERE username = ? AND password = ?';
+  const user = db.prepare(query).get(username, password);
 
   if (user) {
     // VULN: Weak cryptographic algorithm (CWE-327) - MD5 for token generation
@@ -40,7 +40,7 @@ router.post('/reset-password', (req, res) => {
   const resetToken = Math.random().toString(36).substring(2);
   const expiry = Date.now() + 3600000;
 
-  db.prepare(`UPDATE users SET reset_token = '${resetToken}', reset_expiry = ${expiry} WHERE email = '${email}'`).run();
+  db.prepare('UPDATE users SET reset_token = ?, reset_expiry = ? WHERE email = ?').run(resetToken, expiry, email);
 
   res.json({ message: 'Password reset email sent', token: resetToken });
 });
@@ -54,7 +54,7 @@ router.get('/users', (req, res) => {
 // VULN: Cleartext storage of password (CWE-312)
 router.post('/register', (req, res) => {
   const { username, password, email } = req.body;
-  db.prepare(`INSERT INTO users (username, password, email) VALUES ('${username}', '${password}', '${email}')`).run();
+  db.prepare('INSERT INTO users (username, password, email) VALUES (?, ?, ?)').run(username, password, email);
   res.json({ message: 'User registered' });
 });
 

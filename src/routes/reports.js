@@ -44,48 +44,14 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - use allowlisted resource map
-// instead of passing user-controlled URLs to http.get
+// VULN: Server-Side Request Forgery (CWE-918)
 const http = require('http');
-const https = require('https');
-
-// Map of allowed resource keys to their full URLs.
-// No user input flows into the URL — the user selects a key, and the
-// corresponding constant URL is fetched.
-const ALLOWED_RESOURCES = {
-  'api-data': 'https://api.example.com/data',
-  'reports-summary': 'https://reports.example.com/summary',
-  'data-stats': 'https://data.example.com/stats'
-};
-
 router.get('/fetch-external', (req, res) => {
-  const resourceKey = req.query.resource;
-  if (!resourceKey) {
-    return res.status(400).json({
-      error: 'Resource parameter is required',
-      allowed: Object.keys(ALLOWED_RESOURCES)
-    });
-  }
-
-  // Only allow keys that exist in the constant map (prevents SSRF)
-  if (!Object.prototype.hasOwnProperty.call(ALLOWED_RESOURCES, resourceKey)) {
-    return res.status(403).json({
-      error: 'Unknown resource key',
-      allowed: Object.keys(ALLOWED_RESOURCES)
-    });
-  }
-
-  // URL comes entirely from the constant map — no user input in the URL
-  const targetUrl = ALLOWED_RESOURCES[resourceKey];
-  const parsedUrl = new URL(targetUrl);
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-
-  client.get(targetUrl, (response) => {
+  const url = req.query.url;
+  http.get(url, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));
-  }).on('error', (err) => {
-    res.status(500).json({ error: 'Failed to fetch external resource' });
   });
 });
 

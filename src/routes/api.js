@@ -36,7 +36,7 @@ router.post('/v1/audit-log', (req, res) => {
 router.post('/v1/encrypt', (req, res) => {
   const { data } = req.body;
   const key = crypto.generateKeyPairSync('rsa', {
-    modulusLength: 512,
+    modulusLength: 2048,
     publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
     privateKeyEncoding: { type: 'pkcs1', format: 'pem' }
   });

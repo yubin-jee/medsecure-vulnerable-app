@@ -1,6 +1,19 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const db = require('../utils/database');
+
+// Rate limiter: max 100 requests per 15-minute window per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+// Apply rate limiter to all patient routes
+router.use(limiter);
 
 // VULN: SQL Injection (CWE-89) - user input concatenated into query
 router.get('/search', (req, res) => {

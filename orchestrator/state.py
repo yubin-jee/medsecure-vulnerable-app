@@ -19,19 +19,29 @@ logger = logging.getLogger(__name__)
 STATE_FILE = os.path.join(os.path.dirname(__file__), "state.json")
 
 
+DEFAULT_STATE = {
+    "sessions": [],
+    "processed_alerts": [],
+    "notified_sessions": [],
+    "history": [],
+    "last_run": None,
+}
+
+
 def load_state() -> dict:
     """Load the orchestrator state from disk."""
     if not os.path.exists(STATE_FILE):
-        return {
-            "sessions": [],
-            "processed_alerts": [],
-            "notified_sessions": [],
-            "history": [],
-            "last_run": None,
-        }
+        return dict(DEFAULT_STATE)
 
     with open(STATE_FILE, "r") as f:
-        return json.load(f)
+        data = json.load(f)
+
+    # Ensure all required keys exist (handles empty or partial state files)
+    for key, default in DEFAULT_STATE.items():
+        if key not in data:
+            data[key] = default
+
+    return data
 
 
 def save_state(state: dict) -> None:

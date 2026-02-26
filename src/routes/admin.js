@@ -51,18 +51,16 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// FIX: Prevent prototype pollution by using a null-prototype object
-// and rejecting dangerous property names (CodeQL alert #40)
-const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+// FIX: Use Map to prevent prototype pollution (CodeQL alert #40)
+// Map avoids property injection because it does not use bracket notation
+// on a plain object with user-controlled keys.
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = Object.create(null);
+  const settings = new Map();
   Object.keys(userSettings).forEach(key => {
-    if (!BLOCKED_KEYS.has(key)) {
-      settings[key] = userSettings[key];
-    }
+    settings.set(key, userSettings[key]);
   });
-  res.json({ settings });
+  res.json({ settings: Object.fromEntries(settings) });
 });
 
 module.exports = router;

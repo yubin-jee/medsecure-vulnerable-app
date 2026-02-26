@@ -34,18 +34,15 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - sanitize each path segment with path.basename
+// FIX: Path traversal (CWE-22) - sanitize with path.basename to prevent traversal
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
   if (!reportPath) {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
-  // Sanitize each segment with path.basename to strip traversal components
-  const segments = reportPath.split('/').filter(Boolean).map(s => path.basename(s));
-  if (segments.length === 0) {
-    return res.status(400).json({ error: 'Invalid path' });
-  }
-  const resolvedPath = path.join('/reports', ...segments);
+  // path.basename strips all directory components, preventing traversal
+  const safeName = path.basename(reportPath);
+  const resolvedPath = path.join('/reports', safeName);
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });

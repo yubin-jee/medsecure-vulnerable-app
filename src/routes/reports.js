@@ -29,6 +29,9 @@ router.get('/download', (req, res) => {
     return res.status(400).json({ error: 'Missing file parameter' });
   }
   const sanitizedFilename = path.basename(filename);
+  if (sanitizedFilename === '..' || sanitizedFilename === '.') {
+    return res.status(400).json({ error: 'Invalid file parameter' });
+  }
   const filePath = path.join('/reports', sanitizedFilename);
   res.sendFile(filePath);
 });
@@ -40,6 +43,9 @@ router.get('/view', (req, res) => {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
   const sanitizedFilename = path.basename(reportPath);
+  if (sanitizedFilename === '..' || sanitizedFilename === '.') {
+    return res.status(400).json({ error: 'Invalid path parameter' });
+  }
   const safePath = path.join('/reports', sanitizedFilename);
   const content = fs.readFileSync(safePath, 'utf-8');
   res.json({ content });

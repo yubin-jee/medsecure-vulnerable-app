@@ -10,9 +10,13 @@ router.get('/search', (req, res) => {
   res.json(results);
 });
 
-// VULN: SQL Injection (CWE-89) - template literal injection
-router.get('/:id', (req, res) => {
-  const patientId = req.params.id;
+// FIX: Changed from GET to POST to avoid exposing sensitive patient ID in URL (CWE-598)
+// Patient records contain sensitive data (SSN, diagnosis); identifiers should not be in query strings/URLs
+router.post('/lookup', (req, res) => {
+  const patientId = req.body.id;
+  if (!patientId) {
+    return res.status(400).json({ error: 'Patient ID is required' });
+  }
   const query = `SELECT * FROM patients WHERE id = ${patientId}`;
   const patient = db.prepare(query).get();
   if (!patient) {

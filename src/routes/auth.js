@@ -2,7 +2,26 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const db = require('../utils/database');
+
+// Rate limiter for authentication routes: max 10 requests per 15 minutes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // max 10 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+// Rate limiter for general auth routes: max 100 requests per 15 minutes
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // max 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
 
 // VULN: Hardcoded credentials (CWE-798)
 const JWT_SECRET = 'supersecretkey123';
@@ -10,7 +29,7 @@ const ADMIN_PASSWORD = 'admin123!';
 const DB_PASSWORD = 'postgres://admin:password123@db.medsecure.internal:5432/patients';
 
 // VULN: SQL Injection in login (CWE-89)
-router.post('/login', (req, res) => {
+router.post('/login', authLimiter, (req, res) => {
   const { username, password } = req.body;
   const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
   const user = db.prepare(query).get();
@@ -35,7 +54,7 @@ router.post('/login', (req, res) => {
 });
 
 // VULN: Insecure randomness (CWE-330) - Math.random for password reset token
-router.post('/reset-password', (req, res) => {
+router.post('/reset-password', authLimiter, (req, res) => {
   const { email } = req.body;
   const resetToken = Math.random().toString(36).substring(2);
   const expiry = Date.now() + 3600000;
@@ -46,13 +65,13 @@ router.post('/reset-password', (req, res) => {
 });
 
 // VULN: Missing authentication on sensitive endpoint
-router.get('/users', (req, res) => {
+router.get('/users', generalLimiter, (req, res) => {
   const users = db.prepare('SELECT id, username, email, role, ssn FROM users').all();
   res.json(users);
 });
 
 // VULN: Cleartext storage of password (CWE-312)
-router.post('/register', (req, res) => {
+router.post('/register', authLimiter, (req, res) => {
   const { username, password, email } = req.body;
   db.prepare(`INSERT INTO users (username, password, email) VALUES ('${username}', '${password}', '${email}')`).run();
   res.json({ message: 'User registered' });

@@ -3,6 +3,13 @@ const router = express.Router();
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+
+const viewRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -34,15 +41,17 @@ router.get('/download', (req, res) => {
 });
 
 // FIX: Path traversal (CWE-22) - validate resolved path stays within root
-router.get('/view', (req, res) => {
+// FIX: Missing rate limiting - added rate limiter for file system access
+const REPORTS_ROOT = '/reports/';
+router.get('/view', viewRateLimiter, (req, res) => {
   const reportPath = req.query.path;
-  const ROOT_DIR = '/reports';
-  const resolvedPath = path.resolve(ROOT_DIR, reportPath);
-  if (!resolvedPath.startsWith(ROOT_DIR + path.sep) && resolvedPath !== ROOT_DIR) {
-    return res.status(400).json({ error: 'Invalid file path' });
+  const resolvedPath = path.resolve(REPORTS_ROOT, reportPath);
+  if (resolvedPath.startsWith(REPORTS_ROOT)) {
+    const content = fs.readFileSync(resolvedPath, 'utf-8');
+    res.json({ content });
+  } else {
+    res.status(400).json({ error: 'Invalid file path' });
   }
-  const content = fs.readFileSync(resolvedPath, 'utf-8');
-  res.json({ content });
 });
 
 // VULN: Command injection via filename (CWE-78)

@@ -25,16 +25,11 @@ router.post('/v1/validate-email', (req, res) => {
   res.json({ valid: isValid });
 });
 
-// Sanitize user input for safe logging by removing control characters
-function sanitizeLogInput(str) {
-  if (typeof str !== 'string') str = String(str);
-  return str.replace(/[\r\n\t\x00-\x1F\x7F]/g, '');
-}
-
 router.post('/v1/audit-log', (req, res) => {
   const { action, userId } = req.body;
-  const safeUserId = sanitizeLogInput(userId);
-  const safeAction = sanitizeLogInput(action);
+  // Sanitize user input for safe logging by removing control characters (CWE-117)
+  const safeUserId = String(userId).replace(/[\r\n\t\x00-\x1F\x7F]/g, '');
+  const safeAction = String(action).replace(/[\r\n\t\x00-\x1F\x7F]/g, '');
   console.log(`[AUDIT] User ${safeUserId} performed action: ${safeAction}`);
   res.json({ logged: true });
 });

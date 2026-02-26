@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const db = require('../utils/database');
 const crypto = require('crypto');
+const RateLimit = require('express-rate-limit');
+
+// Rate limiter: max 100 requests per 15-minute window
+const apiLimiter = RateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // max 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiter to all API routes
+router.use(apiLimiter);
 
 // VULN: SQL injection in API endpoint (CWE-89)
 router.get('/v1/records', (req, res) => {

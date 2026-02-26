@@ -46,15 +46,17 @@ router.delete('/:id', (req, res) => {
 });
 
 // FIXED: SQL Injection (CWE-89) - use parameterized queries with whitelisted columns
-const ALLOWED_COLUMNS = new Set(['name', 'dob', 'ssn', 'diagnosis']);
+// Column names are sourced from a hardcoded array, never from user input
+const ALLOWED_COLUMNS = ['name', 'dob', 'ssn', 'diagnosis'];
 
 router.post('/bulk-update', (req, res) => {
   const updates = req.body;
   updates.forEach(update => {
-    const entries = Object.entries(update).filter(([key]) => key !== 'id' && ALLOWED_COLUMNS.has(key));
-    if (entries.length === 0) return;
-    const setClauses = entries.map(([key]) => `${key} = ?`).join(', ');
-    const values = entries.map(([, val]) => val);
+    // Filter allowed columns to only those present in the update object
+    const columnsToUpdate = ALLOWED_COLUMNS.filter(col => Object.prototype.hasOwnProperty.call(update, col));
+    if (columnsToUpdate.length === 0) return;
+    const setClauses = columnsToUpdate.map(col => `${col} = ?`).join(', ');
+    const values = columnsToUpdate.map(col => update[col]);
     values.push(update.id);
     db.prepare(`UPDATE patients SET ${setClauses} WHERE id = ?`).run(...values);
   });

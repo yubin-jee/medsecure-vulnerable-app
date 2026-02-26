@@ -51,11 +51,15 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// VULN: Prototype pollution via merge (CWE-1321)
+// Safely copy user settings, preventing prototype pollution (CWE-1321)
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = {};
+  const settings = Object.create(null);
   Object.keys(userSettings).forEach(key => {
+    if (FORBIDDEN_KEYS.has(key)) {
+      return; // skip dangerous property names
+    }
     settings[key] = userSettings[key];
   });
   res.json({ settings });

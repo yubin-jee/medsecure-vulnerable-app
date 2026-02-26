@@ -7,7 +7,7 @@
 #
 # Triggers:
 #   - On a schedule (every 2 hours) to pick up new alerts and check progress
-#   - When a new code scanning alert is created
+#   - After CodeQL analysis completes
 #   - Manually via workflow_dispatch
 #
 # Each run is idempotent — it skips already-processed alerts and only
@@ -20,9 +20,10 @@ on:
     # Run every 2 hours to pick up new alerts and check session progress
     - cron: "0 */2 * * *"
 
-  # Trigger when CodeQL finds a new alert
-  code_scanning_alert:
-    types: [created]
+  # Trigger after CodeQL analysis workflow completes
+  workflow_run:
+    workflows: ["CodeQL"]
+    types: [completed]
 
   # Allow manual trigger from the Actions tab
   workflow_dispatch:

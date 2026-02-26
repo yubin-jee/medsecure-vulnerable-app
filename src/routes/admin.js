@@ -1,6 +1,19 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const db = require('../utils/database');
+
+// Rate limiter for admin routes: max 100 requests per 15 minutes per IP
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+});
+
+// Apply rate limiter to all admin routes
+router.use(adminLimiter);
 
 // VULN: Reflected XSS (CWE-79) - user input rendered without escaping
 router.get('/search-users', (req, res) => {

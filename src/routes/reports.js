@@ -44,43 +44,32 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
-const http = require('http');
+// FIX: Server-Side Request Forgery (CWE-918) - use allowlist lookup instead of
+// accepting arbitrary URLs. The user provides a target key that maps to a
+// pre-approved URL, so no user input flows into the outbound request URL.
 const https = require('https');
-const { URL } = require('url');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'data.example.com',
-  'reports.example.com',
-];
+const ALLOWED_EXTERNAL_URLS = {
+  'api': 'https://api.example.com/data',
+  'data': 'https://data.example.com/data',
+  'reports': 'https://reports.example.com/data',
+};
 
 router.get('/fetch-external', (req, res) => {
-  const rawUrl = req.query.url;
+  const target = req.query.target;
 
-  if (!rawUrl) {
-    return res.status(400).json({ error: 'Missing url parameter' });
+  if (!target) {
+    return res.status(400).json({ error: 'Missing target parameter' });
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(rawUrl);
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid URL' });
+  // Look up the target in the allowlist; only pre-approved URLs can be fetched
+  const targetUrl = ALLOWED_EXTERNAL_URLS[target];
+  if (!targetUrl) {
+    return res.status(403).json({ error: 'Target not in allowlist. Allowed targets: ' + Object.keys(ALLOWED_EXTERNAL_URLS).join(', ') });
   }
 
-  // Only allow http and https protocols
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http and https protocols are allowed' });
-  }
-
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
-    return res.status(403).json({ error: 'Hostname not in allowlist' });
-  }
-
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl.href, (response) => {
+  // targetUrl is a static string from the allowlist — no user input in the URL
+  https.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

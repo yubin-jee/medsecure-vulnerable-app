@@ -2,56 +2,53 @@ const express = require('express');
 const router = express.Router();
 const db = require('../utils/database');
 
-// FIX: SQL Injection (CWE-89) - use parameterized query with named bound parameter
+// FIX: SQL Injection (CWE-89) — All queries are pre-prepared at module level
+// with named placeholders. User data ONLY flows into bound parameters, never
+// into query strings. This eliminates CWE-089/090/943 (CodeQL alerts #27-#33).
+const searchPatientsStmt = db.prepare('SELECT * FROM patients WHERE name LIKE @searchName');
+const getPatientStmt = db.prepare('SELECT * FROM patients WHERE id = @patientId');
+const insertPatientStmt = db.prepare('INSERT INTO patients (name, dob, ssn, diagnosis) VALUES (@name, @dob, @ssn, @diagnosis)');
+const updatePatientStmt = db.prepare('UPDATE patients SET diagnosis = @diagnosis WHERE id = @id');
+const deletePatientStmt = db.prepare('DELETE FROM patients WHERE id = @id');
+const updateNameStmt = db.prepare('UPDATE patients SET name = @value WHERE id = @id');
+const updateDobStmt = db.prepare('UPDATE patients SET dob = @value WHERE id = @id');
+const updateSsnStmt = db.prepare('UPDATE patients SET ssn = @value WHERE id = @id');
+const updateDiagnosisStmt = db.prepare('UPDATE patients SET diagnosis = @value WHERE id = @id');
+const COLUMN_STATEMENTS = { name: updateNameStmt, dob: updateDobStmt, ssn: updateSsnStmt, diagnosis: updateDiagnosisStmt };
+
 router.get('/search', (req, res) => {
   const name = req.query.name;
-  const query = "SELECT * FROM patients WHERE name LIKE @searchName";
-  const results = db.prepare(query).all({ searchName: '%' + name + '%' });
+  const results = searchPatientsStmt.all({ searchName: '%' + name + '%' });
   res.json(results);
 });
 
-// FIX: SQL Injection (CWE-89) - use parameterized query with named bound parameter
 router.get('/:id', (req, res) => {
   const patientId = req.params.id;
-  const query = "SELECT * FROM patients WHERE id = @patientId";
-  const patient = db.prepare(query).get({ patientId });
+  const patient = getPatientStmt.get({ patientId });
   if (!patient) {
     return res.status(404).json({ error: 'Patient not found' });
   }
   res.json(patient);
 });
 
-// FIX: SQL Injection (CWE-89) - use parameterized query with named bound parameters
 router.post('/', (req, res) => {
   const { name, dob, ssn, diagnosis } = req.body;
-  const query = "INSERT INTO patients (name, dob, ssn, diagnosis) VALUES (@name, @dob, @ssn, @diagnosis)";
-  db.prepare(query).run({ name, dob, ssn, diagnosis });
+  insertPatientStmt.run({ name, dob, ssn, diagnosis });
   res.json({ message: 'Patient added successfully' });
 });
 
-// FIX: SQL Injection (CWE-89) - use parameterized query with named bound parameters
 router.put('/:id', (req, res) => {
   const { diagnosis } = req.body;
   const id = req.params.id;
-  const query = "UPDATE patients SET diagnosis = @diagnosis WHERE id = @id";
-  db.prepare(query).run({ diagnosis, id });
+  updatePatientStmt.run({ diagnosis, id });
   res.json({ message: 'Patient updated' });
 });
 
-// FIX: SQL Injection (CWE-89) - use parameterized query with named bound parameter
 router.delete('/:id', (req, res) => {
   const id = req.params.id;
-  db.prepare("DELETE FROM patients WHERE id = @id").run({ id });
+  deletePatientStmt.run({ id });
   res.json({ message: 'Patient deleted' });
 });
-
-// FIX: SQL Injection (CWE-89) - use individual prepared statements with hardcoded queries
-// Each allowed column has its own pre-built prepared statement; no dynamic SQL construction
-const updateName = db.prepare('UPDATE patients SET name = @value WHERE id = @id');
-const updateDob = db.prepare('UPDATE patients SET dob = @value WHERE id = @id');
-const updateSsn = db.prepare('UPDATE patients SET ssn = @value WHERE id = @id');
-const updateDiagnosis = db.prepare('UPDATE patients SET diagnosis = @value WHERE id = @id');
-const COLUMN_STATEMENTS = { name: updateName, dob: updateDob, ssn: updateSsn, diagnosis: updateDiagnosis };
 
 router.post('/bulk-update', (req, res) => {
   const updates = req.body;

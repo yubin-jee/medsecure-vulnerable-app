@@ -44,14 +44,53 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// VULN: Server-Side Request Forgery (CWE-918)
+// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
 const http = require('http');
+const { URL } = require('url');
+
+const ALLOWED_EXTERNAL_HOSTS = [
+  'api.medsecure.example.com',
+  'reports.medsecure.example.com',
+  'data.medsecure.example.com',
+];
+
 router.get('/fetch-external', (req, res) => {
-  const url = req.query.url;
-  http.get(url, (response) => {
+  const rawUrl = req.query.url;
+
+  // Validate that a URL was provided
+  if (!rawUrl) {
+    return res.status(400).json({ error: 'URL parameter is required' });
+  }
+
+  // Parse and validate the URL
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(rawUrl);
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid URL format' });
+  }
+
+  // Only allow the http: protocol
+  if (parsedUrl.protocol !== 'http:') {
+    return res.status(400).json({ error: 'Only http: protocol is allowed' });
+  }
+
+  // Validate hostname against allowlist to prevent SSRF
+  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
+    return res.status(403).json({ error: 'Requested host is not in the allowlist' });
+  }
+
+  // Reject URLs containing user credentials (user:pass@host)
+  if (parsedUrl.username || parsedUrl.password) {
+    return res.status(400).json({ error: 'URLs with embedded credentials are not allowed' });
+  }
+
+  http.get(parsedUrl.href, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));
+  }).on('error', (err) => {
+    res.status(502).json({ error: 'Failed to fetch external resource' });
   });
 });
 

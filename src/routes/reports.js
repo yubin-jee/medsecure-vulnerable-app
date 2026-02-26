@@ -33,15 +33,23 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - reject traversal sequences and absolute paths
+// FIX: Path traversal (CWE-22) - normalize with realpathSync and validate prefix
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  if (reportPath.includes('..') || path.isAbsolute(reportPath)) {
+  if (typeof reportPath !== 'string') {
     return res.status(400).json({ error: 'Invalid file path' });
   }
-  const filePath = path.join('/reports', reportPath);
-  const content = fs.readFileSync(filePath, 'utf-8');
-  res.json({ content });
+  const ROOT = '/reports/';
+  try {
+    const resolvedPath = fs.realpathSync(path.resolve(ROOT, reportPath));
+    if (!resolvedPath.startsWith(ROOT)) {
+      return res.status(400).json({ error: 'Invalid file path' });
+    }
+    const content = fs.readFileSync(resolvedPath, 'utf-8');
+    res.json({ content });
+  } catch (e) {
+    return res.status(404).json({ error: 'File not found' });
+  }
 });
 
 // VULN: Command injection via filename (CWE-78)

@@ -51,18 +51,14 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// Prototype pollution prevention: reject dangerous property names (CWE-1321)
-const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
+// Use Map to prevent prototype pollution (CWE-1321) - avoids dynamic property writes
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = Object.create(null);
+  const settingsMap = new Map();
   Object.keys(userSettings).forEach(key => {
-    if (!BLOCKED_KEYS.has(key) && Object.prototype.hasOwnProperty.call(userSettings, key)) {
-      settings[key] = userSettings[key];
-    }
+    settingsMap.set(key, userSettings[key]);
   });
-  res.json({ settings });
+  res.json({ settings: Object.fromEntries(settingsMap) });
 });
 
 module.exports = router;

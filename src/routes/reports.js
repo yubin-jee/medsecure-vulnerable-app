@@ -44,54 +44,34 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIXED: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
+// FIXED: Server-Side Request Forgery (CWE-918) - use predefined URL map instead of user-supplied URLs
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'data.example.com',
-  'reports.example.com'
-];
-
-function isAllowedUrl(inputUrl) {
-  let parsed;
-  try {
-    parsed = new URL(inputUrl);
-  } catch (e) {
-    return false;
-  }
-
-  // Only allow http and https protocols
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return false;
-  }
-
-  // Reject URLs with credentials
-  if (parsed.username || parsed.password) {
-    return false;
-  }
-
-  // Validate hostname against allowlist
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsed.hostname)) {
-    return false;
-  }
-
-  return true;
-}
+// Map of allowed source identifiers to their predefined URLs.
+// User input selects a key; the actual URL is never derived from user input.
+const ALLOWED_REPORT_SOURCES = {
+  'api-data': 'https://api.example.com/data',
+  'external-reports': 'https://reports.example.com/latest',
+  'data-feed': 'https://data.example.com/feed'
+};
 
 router.get('/fetch-external', (req, res) => {
-  const url = req.query.url;
+  const source = req.query.source;
 
-  if (!url || !isAllowedUrl(url)) {
-    return res.status(400).json({ error: 'Invalid or disallowed URL. Only approved external hosts are permitted.' });
+  if (!source || !Object.prototype.hasOwnProperty.call(ALLOWED_REPORT_SOURCES, source)) {
+    return res.status(400).json({
+      error: 'Invalid source. Allowed sources: ' + Object.keys(ALLOWED_REPORT_SOURCES).join(', ')
+    });
   }
 
-  const parsed = new URL(url);
+  // URL is entirely server-defined; no user input flows into the request URL
+  const targetUrl = ALLOWED_REPORT_SOURCES[source];
+  const parsed = new URL(targetUrl);
   const client = parsed.protocol === 'https:' ? https : http;
 
-  client.get(parsed, (response) => {
+  client.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

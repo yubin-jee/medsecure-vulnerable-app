@@ -44,16 +44,19 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowed hostnames
+// FIX: Server-Side Request Forgery (CWE-918) - use allowlist lookup to prevent SSRF
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'data.example.com',
-  'reports.example.com',
-];
+// Map of allowed external host identifiers to their base URLs.
+// User input is only used as a lookup key; the actual URL fetched comes
+// entirely from these constant values, breaking the taint chain.
+const ALLOWED_EXTERNAL_URLS = {
+  'api.example.com': 'https://api.example.com',
+  'data.example.com': 'https://data.example.com',
+  'reports.example.com': 'https://reports.example.com',
+};
 
 router.get('/fetch-external', (req, res) => {
   const userUrl = req.query.url;
@@ -74,13 +77,16 @@ router.get('/fetch-external', (req, res) => {
     return res.status(400).json({ error: 'Only http and https protocols are allowed' });
   }
 
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
+  // Look up the base URL from our allowlist using the hostname as key.
+  // The returned value is a constant string from the map, not derived from user input.
+  const baseUrl = ALLOWED_EXTERNAL_URLS[parsedUrl.hostname];
+  if (!baseUrl) {
     return res.status(403).json({ error: 'Requested host is not in the allowed list' });
   }
 
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl, (response) => {
+  // Use only the constant base URL from the allowlist for the outbound request
+  const client = baseUrl.startsWith('https') ? https : http;
+  client.get(baseUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

@@ -44,14 +44,46 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// VULN: Server-Side Request Forgery (CWE-918)
+// FIXED: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
 const http = require('http');
+
+const ALLOWED_HOSTS = [
+  'api.medsecure.com',
+  'data.medsecure.com',
+  'reports.medsecure.com'
+];
+
 router.get('/fetch-external', (req, res) => {
-  const url = req.query.url;
-  http.get(url, (response) => {
+  const urlInput = req.query.url;
+
+  if (!urlInput) {
+    return res.status(400).json({ error: 'URL parameter is required' });
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(urlInput);
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  // Only allow http protocol
+  if (parsedUrl.protocol !== 'http:') {
+    return res.status(400).json({ error: 'Only HTTP protocol is allowed' });
+  }
+
+  // Validate hostname against allowlist
+  if (!ALLOWED_HOSTS.includes(parsedUrl.hostname)) {
+    return res.status(403).json({ error: 'Requested host is not allowed' });
+  }
+
+  const sanitizedUrl = parsedUrl.toString();
+  http.get(sanitizedUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));
+  }).on('error', (err) => {
+    res.status(500).json({ error: 'Failed to fetch external resource' });
   });
 });
 

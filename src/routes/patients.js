@@ -17,8 +17,7 @@ router.post('/lookup', (req, res) => {
   if (!patientId) {
     return res.status(400).json({ error: 'Patient ID is required' });
   }
-  const query = `SELECT * FROM patients WHERE id = ${patientId}`;
-  const patient = db.prepare(query).get();
+  const patient = db.prepare('SELECT * FROM patients WHERE id = ?').get(patientId);
   if (!patient) {
     return res.status(404).json({ error: 'Patient not found' });
   }

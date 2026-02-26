@@ -22,25 +22,17 @@ router.post('/export', (req, res) => {
   });
 });
 
-// FIX: Path traversal (CWE-22) - validate resolved path stays within root
+// FIX: Path traversal (CWE-22) - sanitize filename to prevent directory traversal
 router.get('/download', (req, res) => {
-  const filename = req.query.file;
-  const ROOT_DIR = '/reports';
-  const filePath = path.resolve(ROOT_DIR, filename);
-  if (!filePath.startsWith(ROOT_DIR + path.sep) && filePath !== ROOT_DIR) {
-    return res.status(400).json({ error: 'Invalid file path' });
-  }
+  const filename = path.basename(req.query.file);
+  const filePath = path.join('/reports', filename);
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - validate resolved path stays within root
+// FIX: Path traversal (CWE-22) - sanitize path to prevent directory traversal
 router.get('/view', (req, res) => {
-  const reportPath = req.query.path;
-  const ROOT_DIR = '/reports';
-  const resolvedPath = path.resolve(ROOT_DIR, reportPath);
-  if (!resolvedPath.startsWith(ROOT_DIR + path.sep) && resolvedPath !== ROOT_DIR) {
-    return res.status(400).json({ error: 'Invalid file path' });
-  }
+  const reportName = path.basename(req.query.path);
+  const resolvedPath = path.join('/reports', reportName);
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });

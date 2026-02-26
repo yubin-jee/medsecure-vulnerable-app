@@ -194,6 +194,10 @@ def dispatch_batches(
             available_slots -= 1
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to create session for {batch.batch_id}: {e}")
+            # Stop dispatching on rate limit — don't hammer the API
+            if "429" in str(e):
+                logger.error("Rate limited by Devin API. Stopping dispatch.")
+                break
             new_sessions.append(
                 DevinSession(
                     session_id="",

@@ -44,57 +44,51 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIXED: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
+// FIXED: Server-Side Request Forgery (CWE-918) - use allowlist-based URL construction
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.medsecure.example.com',
-  'data.medsecure.example.com',
-  'reports.medsecure.example.com'
-];
+// Map of allowed report source keys to their base URLs.
+// The user selects a source by key; the hostname is never taken from user input.
+const ALLOWED_REPORT_SOURCES = {
+  'api': 'https://api.medsecure.example.com',
+  'data': 'https://data.medsecure.example.com',
+  'reports': 'https://reports.medsecure.example.com'
+};
 
-const ALLOWED_PROTOCOLS = ['http:', 'https:'];
-
-function isAllowedUrl(userUrl) {
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(userUrl);
-  } catch (e) {
-    return { allowed: false, reason: 'Invalid URL' };
+// Sanitize the path component to prevent path traversal
+function sanitizePath(userPath) {
+  if (!userPath) {
+    return '/';
   }
-
-  if (!ALLOWED_PROTOCOLS.includes(parsedUrl.protocol)) {
-    return { allowed: false, reason: 'Protocol not allowed' };
-  }
-
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
-    return { allowed: false, reason: 'Hostname not in allowlist' };
-  }
-
-  // Block credentials in URL
-  if (parsedUrl.username || parsedUrl.password) {
-    return { allowed: false, reason: 'Credentials in URL not allowed' };
-  }
-
-  return { allowed: true, parsedUrl };
+  // Normalize and resolve the path to prevent traversal (e.g. /../)
+  const normalized = path.posix.normalize(userPath);
+  // Ensure it starts with /
+  return normalized.startsWith('/') ? normalized : '/' + normalized;
 }
 
 router.get('/fetch-external', (req, res) => {
-  const userUrl = req.query.url;
+  const source = req.query.source;
+  const resourcePath = req.query.path;
 
-  if (!userUrl) {
-    return res.status(400).json({ error: 'Missing url parameter' });
+  if (!source) {
+    return res.status(400).json({ error: 'Missing source parameter. Valid sources: ' + Object.keys(ALLOWED_REPORT_SOURCES).join(', ') });
   }
 
-  const validation = isAllowedUrl(userUrl);
-  if (!validation.allowed) {
-    return res.status(403).json({ error: `Forbidden: ${validation.reason}` });
+  // Look up the base URL from the allowlist using the user-provided key.
+  // This ensures the hostname is never derived from user input.
+  const baseUrl = ALLOWED_REPORT_SOURCES[source];
+  if (!baseUrl) {
+    return res.status(403).json({ error: 'Invalid source. Valid sources: ' + Object.keys(ALLOWED_REPORT_SOURCES).join(', ') });
   }
 
-  const client = validation.parsedUrl.protocol === 'https:' ? https : http;
-  client.get(validation.parsedUrl.href, (response) => {
+  // Construct the full URL from the trusted base URL and a sanitized path
+  const safePath = sanitizePath(resourcePath);
+  const targetUrl = baseUrl + safePath;
+
+  const client = targetUrl.startsWith('https:') ? https : http;
+  client.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

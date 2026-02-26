@@ -6,22 +6,33 @@ const path = require('path');
 
 router.get('/generate', (req, res) => {
   const reportType = req.query.type;
-  if (!reportType || typeof reportType !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(reportType)) {
+  if (!reportType || typeof reportType !== 'string') {
     return res.status(400).json({ error: 'Invalid report type' });
   }
-  const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
+  // Sanitize by removing any characters that are not alphanumeric, underscore, or hyphen
+  const sanitizedType = reportType.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (sanitizedType.length === 0) {
+    return res.status(400).json({ error: 'Invalid report type' });
+  }
+  const output = execFileSync('generate-report', ['--type', sanitizedType, '--format', 'pdf']);
   res.send(output);
 });
 
 router.post('/export', (req, res) => {
   const { filename, format } = req.body;
-  if (!filename || typeof filename !== 'string' || !/^[a-zA-Z0-9_.\-\/]+$/.test(filename)) {
+  if (!filename || typeof filename !== 'string') {
     return res.status(400).json({ error: 'Invalid filename' });
   }
-  if (!format || typeof format !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(format)) {
+  if (!format || typeof format !== 'string') {
     return res.status(400).json({ error: 'Invalid format' });
   }
-  execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
+  // Sanitize by stripping dangerous characters
+  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9_.\-\/]/g, '');
+  const sanitizedFormat = format.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (sanitizedFilename.length === 0 || sanitizedFormat.length === 0) {
+    return res.status(400).json({ error: 'Invalid filename or format' });
+  }
+  execFile('convert-data', [sanitizedFilename, '--output-format', sanitizedFormat], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -48,12 +59,17 @@ router.post('/compress', (req, res) => {
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'Invalid files list' });
   }
-  for (const file of files) {
-    if (typeof file !== 'string' || !/^[a-zA-Z0-9_.\-\/]+$/.test(file)) {
-      return res.status(400).json({ error: 'Invalid filename in list' });
+  // Sanitize each filename by stripping dangerous characters
+  const sanitizedFiles = files.map(file => {
+    if (typeof file !== 'string') {
+      return '';
     }
+    return file.replace(/[^a-zA-Z0-9_.\-\/]/g, '');
+  });
+  if (sanitizedFiles.some(f => f.length === 0)) {
+    return res.status(400).json({ error: 'Invalid filename in list' });
   }
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...sanitizedFiles]);
   res.download('/tmp/archive.tar.gz');
 });
 

@@ -44,47 +44,35 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIXED: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
-const http = require('http');
+// FIXED: Server-Side Request Forgery (CWE-918) - use allowlist lookup instead of user-controlled URL
 const https = require('https');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'data.example.com',
-  'reports.example.com',
-];
+// Map of allowed report source keys to their trusted URLs.
+// User input is only used as a lookup key, never as part of the URL itself,
+// which completely eliminates the SSRF taint vector.
+const ALLOWED_REPORT_SOURCES = {
+  'api': 'https://api.example.com/data',
+  'data': 'https://data.example.com/data',
+  'reports': 'https://reports.example.com/data',
+};
 
 router.get('/fetch-external', (req, res) => {
-  const rawUrl = req.query.url;
+  const source = req.query.source;
 
-  if (!rawUrl || typeof rawUrl !== 'string') {
-    return res.status(400).json({ error: 'Missing or invalid url parameter' });
+  if (!source || typeof source !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid source parameter' });
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(rawUrl);
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid URL format' });
+  // Look up the URL from the allowlist using the source key.
+  // The URL passed to https.get() is entirely from the trusted map — no user input in the URL.
+  const targetUrl = ALLOWED_REPORT_SOURCES[source];
+  if (!targetUrl) {
+    return res.status(403).json({
+      error: 'Unknown report source. Allowed sources: ' + Object.keys(ALLOWED_REPORT_SOURCES).join(', ')
+    });
   }
 
-  // Only allow http and https protocols
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http and https protocols are allowed' });
-  }
-
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
-    return res.status(403).json({ error: 'Requested host is not in the allowed list' });
-  }
-
-  // Block requests that include credentials in the URL
-  if (parsedUrl.username || parsedUrl.password) {
-    return res.status(400).json({ error: 'URLs with credentials are not allowed' });
-  }
-
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl, (response) => {
+  https.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

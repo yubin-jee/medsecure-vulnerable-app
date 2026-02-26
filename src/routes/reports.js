@@ -17,7 +17,7 @@ router.get('/generate', (req, res) => {
 // FIX: Use execFile with argument array to prevent command injection (CWE-78)
 router.post('/export', (req, res) => {
   const { filename, format } = req.body;
-  if (!filename || !format || !/^[a-zA-Z0-9_.\-/]+$/.test(filename) || !/^[a-zA-Z0-9_-]+$/.test(format)) {
+  if (!filename || !format || !/^[a-zA-Z0-9_.\-]+$/.test(filename) || !/^[a-zA-Z0-9_-]+$/.test(format)) {
     return res.status(400).json({ error: 'Invalid filename or format' });
   }
   execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
@@ -45,7 +45,7 @@ router.get('/view', (req, res) => {
 // FIX: Use execFileSync with argument array to prevent command injection (CWE-78)
 router.post('/compress', (req, res) => {
   const { files } = req.body;
-  if (!Array.isArray(files) || files.length === 0 || !files.every(f => /^[a-zA-Z0-9_.\-/]+$/.test(f))) {
+  if (!Array.isArray(files) || files.length === 0 || !files.every(f => /^[a-zA-Z0-9_.\-]+$/.test(f))) {
     return res.status(400).json({ error: 'Invalid file list' });
   }
   execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);

@@ -3,16 +3,24 @@ const router = express.Router();
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const RateLimit = require('express-rate-limit');
+
+// Rate limiter for report routes: max 100 requests per 15 minutes per IP
+const reportsLimiter = RateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // max 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' },
+});
 
 // VULN: Command injection (CWE-78) - user input in shell command
-router.get('/generate', (req, res) => {
+router.get('/generate', reportsLimiter, (req, res) => {
   const reportType = req.query.type;
   const output = execSync('generate-report --type ' + reportType + ' --format pdf');
   res.send(output);
 });
 
 // VULN: Command injection (CWE-78) - template literal in exec
-router.post('/export', (req, res) => {
+router.post('/export', reportsLimiter, (req, res) => {
   const { filename, format } = req.body;
   exec(`convert-data "${filename}" --output-format ${format}`, (err, stdout) => {
     if (err) {
@@ -23,21 +31,21 @@ router.post('/export', (req, res) => {
 });
 
 // VULN: Path traversal (CWE-22) - user controls file path
-router.get('/download', (req, res) => {
+router.get('/download', reportsLimiter, (req, res) => {
   const filename = req.query.file;
   const filePath = path.join('/reports', filename);
   res.sendFile(filePath);
 });
 
 // VULN: Path traversal (CWE-22) - reading arbitrary files
-router.get('/view', (req, res) => {
+router.get('/view', reportsLimiter, (req, res) => {
   const reportPath = req.query.path;
   const content = fs.readFileSync(reportPath, 'utf-8');
   res.json({ content });
 });
 
 // VULN: Command injection via filename (CWE-78)
-router.post('/compress', (req, res) => {
+router.post('/compress', reportsLimiter, (req, res) => {
   const { files } = req.body;
   const fileList = files.join(' ');
   execSync(`tar -czf /tmp/archive.tar.gz ${fileList}`);

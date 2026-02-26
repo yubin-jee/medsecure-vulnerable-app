@@ -22,9 +22,9 @@ router.post('/export', (req, res) => {
   });
 });
 
-// FIX: Path traversal (CWE-22) - normalize and validate path stays within root
+// FIX: Path traversal (CWE-22) - sanitize, normalize, and validate path stays within root
 router.get('/download', (req, res) => {
-  const filename = req.query.file;
+  const filename = path.basename(req.query.file);
   const filePath = path.resolve('/reports', filename);
   if (!filePath.startsWith('/reports/')) {
     return res.status(403).json({ error: 'Access denied' });
@@ -32,10 +32,10 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - normalize and validate path stays within root
+// FIX: Path traversal (CWE-22) - sanitize, normalize, and validate path stays within root
 router.get('/view', (req, res) => {
-  const reportPath = req.query.path;
-  const filePath = path.resolve('/reports', reportPath);
+  const reportName = path.basename(req.query.path);
+  const filePath = path.resolve('/reports', reportName);
   if (!filePath.startsWith('/reports/')) {
     return res.status(403).json({ error: 'Access denied' });
   }

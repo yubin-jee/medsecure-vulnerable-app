@@ -22,18 +22,31 @@ router.post('/export', (req, res) => {
   });
 });
 
-// FIX: Path traversal (CWE-22) - sanitize filename to prevent directory traversal
+// FIX: Path traversal (CWE-22) - validate and sanitize filename to prevent directory traversal
+const SAFE_FILENAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 router.get('/download', (req, res) => {
   const filename = req.query.file;
+  if (!filename || typeof filename !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid file parameter' });
+  }
   const sanitized = path.basename(filename);
+  if (!SAFE_FILENAME_PATTERN.test(sanitized)) {
+    return res.status(400).json({ error: 'Invalid file name' });
+  }
   const filePath = path.join('/reports', sanitized);
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - sanitize path to prevent directory traversal
+// FIX: Path traversal (CWE-22) - validate and sanitize path to prevent directory traversal
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
+  if (!reportPath || typeof reportPath !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid path parameter' });
+  }
   const sanitized = path.basename(reportPath);
+  if (!SAFE_FILENAME_PATTERN.test(sanitized)) {
+    return res.status(400).json({ error: 'Invalid file name' });
+  }
   const resolvedPath = path.join('/reports', sanitized);
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });

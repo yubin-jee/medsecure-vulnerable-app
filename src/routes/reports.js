@@ -1,20 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { execSync, exec } = require('child_process');
+const { execFileSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
   const reportType = req.query.type;
-  const output = execSync('generate-report --type ' + reportType + ' --format pdf');
+  if (!reportType || typeof reportType !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(reportType)) {
+    return res.status(400).json({ error: 'Invalid report type' });
+  }
+  const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
   res.send(output);
 });
 
-// VULN: Command injection (CWE-78) - template literal in exec
 router.post('/export', (req, res) => {
   const { filename, format } = req.body;
-  exec(`convert-data "${filename}" --output-format ${format}`, (err, stdout) => {
+  if (!filename || typeof filename !== 'string' || !/^[a-zA-Z0-9_.\-\/]+$/.test(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  if (!format || typeof format !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(format)) {
+    return res.status(400).json({ error: 'Invalid format' });
+  }
+  execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -36,11 +43,17 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-// VULN: Command injection via filename (CWE-78)
 router.post('/compress', (req, res) => {
   const { files } = req.body;
-  const fileList = files.join(' ');
-  execSync(`tar -czf /tmp/archive.tar.gz ${fileList}`);
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: 'Invalid files list' });
+  }
+  for (const file of files) {
+    if (typeof file !== 'string' || !/^[a-zA-Z0-9_.\-\/]+$/.test(file)) {
+      return res.status(400).json({ error: 'Invalid filename in list' });
+    }
+  }
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
   res.download('/tmp/archive.tar.gz');
 });
 

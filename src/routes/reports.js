@@ -48,55 +48,37 @@ router.post('/compress', (req, res) => {
 const http = require('http');
 const https = require('https');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.medsecure.example.com',
-  'reports.medsecure.example.com',
-  'data.medsecure.example.com',
-];
+// Allowlist mapping of permitted host identifiers to their base URLs.
+// The user supplies a host key and a path; the actual hostname is never taken from user input.
+const ALLOWED_EXTERNAL_HOSTS = {
+  'api': 'https://api.medsecure.example.com',
+  'reports': 'https://reports.medsecure.example.com',
+  'data': 'https://data.medsecure.example.com',
+};
 
 router.get('/fetch-external', (req, res) => {
-  const rawUrl = req.query.url;
+  const hostKey = req.query.host;
+  const resourcePath = req.query.path || '/';
 
-  if (!rawUrl || typeof rawUrl !== 'string') {
-    return res.status(400).json({ error: 'Missing or invalid url parameter' });
+  if (!hostKey || typeof hostKey !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid host parameter. Use one of: ' + Object.keys(ALLOWED_EXTERNAL_HOSTS).join(', ') });
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(rawUrl);
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid URL format' });
+  // Look up the base URL from the allowlist — the hostname is never derived from user input
+  const baseUrl = ALLOWED_EXTERNAL_HOSTS[hostKey];
+  if (!baseUrl) {
+    return res.status(403).json({ error: 'Requested host key is not in the allowed list. Use one of: ' + Object.keys(ALLOWED_EXTERNAL_HOSTS).join(', ') });
   }
 
-  // Only allow http and https protocols
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http and https protocols are allowed' });
-  }
+  // Sanitize the path to prevent path traversal
+  const sanitizedPath = resourcePath.replace(/\.\./g, '').replace(/\/\//g, '/');
 
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
-    return res.status(403).json({ error: 'Requested hostname is not in the allowed list' });
-  }
+  // Construct the full URL from trusted base + sanitized path (no user-controlled hostname)
+  const targetUrl = new URL(sanitizedPath, baseUrl);
+  const safeUrl = targetUrl.href;
 
-  // Prevent credentials in URL
-  if (parsedUrl.username || parsedUrl.password) {
-    return res.status(400).json({ error: 'Credentials in URL are not allowed' });
-  }
-
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl.href, (response) => {
-    // Do not follow redirects to untrusted hosts
-    if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-      try {
-        const redirectUrl = new URL(response.headers.location, parsedUrl.href);
-        if (!ALLOWED_EXTERNAL_HOSTS.includes(redirectUrl.hostname)) {
-          return res.status(403).json({ error: 'Redirect to disallowed host blocked' });
-        }
-      } catch (e) {
-        return res.status(400).json({ error: 'Invalid redirect URL' });
-      }
-    }
-
+  const client = targetUrl.protocol === 'https:' ? https : http;
+  client.get(safeUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

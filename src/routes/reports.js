@@ -33,16 +33,14 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - reject traversal patterns and absolute paths before reading
+// FIX: Path traversal (CWE-22) - sanitize path with path.basename to strip directory components
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
   if (!reportPath) {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
-  if (reportPath.includes('..') || path.isAbsolute(reportPath)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  const resolvedPath = path.join('/reports', reportPath);
+  const sanitizedFilename = path.basename(reportPath);
+  const resolvedPath = path.join('/reports', sanitizedFilename);
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });

@@ -25,9 +25,9 @@ router.post('/export', (req, res) => {
 // FIX: Path traversal (CWE-22) - validate resolved path stays within root
 router.get('/download', (req, res) => {
   const filename = req.query.file;
-  const ROOT_DIR = '/reports';
-  const filePath = path.resolve(ROOT_DIR, filename);
-  if (!filePath.startsWith(ROOT_DIR + path.sep) && filePath !== ROOT_DIR) {
+  const ROOT = '/reports/';
+  const filePath = path.resolve(ROOT, filename);
+  if (!filePath.startsWith(ROOT)) {
     return res.status(400).json({ error: 'Invalid file path' });
   }
   res.sendFile(filePath);
@@ -36,9 +36,9 @@ router.get('/download', (req, res) => {
 // FIX: Path traversal (CWE-22) - validate resolved path stays within root
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  const ROOT_DIR = '/reports';
-  const resolvedPath = path.resolve(ROOT_DIR, reportPath);
-  if (!resolvedPath.startsWith(ROOT_DIR + path.sep) && resolvedPath !== ROOT_DIR) {
+  const ROOT = '/reports/';
+  const resolvedPath = path.resolve(ROOT, reportPath);
+  if (!resolvedPath.startsWith(ROOT)) {
     return res.status(400).json({ error: 'Invalid file path' });
   }
   const content = fs.readFileSync(resolvedPath, 'utf-8');

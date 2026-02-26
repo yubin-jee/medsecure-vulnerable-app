@@ -27,7 +27,7 @@ router.post('/v1/validate-email', (req, res) => {
 
 // Sanitize user input for safe logging by removing control characters
 function sanitizeLogInput(str) {
-  if (typeof str !== 'string') return String(str);
+  if (typeof str !== 'string') str = String(str);
   return str.replace(/[\r\n\t\x00-\x1F\x7F]/g, '');
 }
 

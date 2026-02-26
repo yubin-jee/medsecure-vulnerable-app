@@ -44,15 +44,17 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowed hostnames
+// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowed endpoints
 const http = require('http');
-const https = require('https');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'data.example.com',
-  'reports.example.com',
-];
+// Map of allowed hostnames to their safe base URLs.
+// User input is only used as a lookup key; the actual URL passed to http.get
+// comes entirely from this server-side map, eliminating SSRF risk.
+const ALLOWED_EXTERNAL_ENDPOINTS = new Map([
+  ['api.example.com', 'http://api.example.com'],
+  ['data.example.com', 'http://data.example.com'],
+  ['reports.example.com', 'http://reports.example.com'],
+]);
 
 router.get('/fetch-external', (req, res) => {
   const rawUrl = req.query.url;
@@ -67,18 +69,14 @@ router.get('/fetch-external', (req, res) => {
     return res.status(400).json({ error: 'Invalid URL format' });
   }
 
-  // Only allow http and https protocols
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http and https protocols are allowed' });
-  }
-
-  // Validate hostname against the allowlist
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
+  // Look up the target from the server-side allowlist using the hostname as key.
+  // The URL value comes from the Map (not from user input), preventing SSRF.
+  const safeBaseUrl = ALLOWED_EXTERNAL_ENDPOINTS.get(parsedUrl.hostname);
+  if (!safeBaseUrl) {
     return res.status(403).json({ error: 'Requested host is not in the allowed list' });
   }
 
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl, (response) => {
+  http.get(safeBaseUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

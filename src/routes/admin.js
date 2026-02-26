@@ -51,11 +51,16 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// VULN: Prototype pollution via merge (CWE-1321)
+// Fixed: Use Object.create(null) to avoid prototype chain and validate property names
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = {};
+  const settings = Object.create(null);
   Object.keys(userSettings).forEach(key => {
+    if (DANGEROUS_KEYS.has(key) || !Object.prototype.hasOwnProperty.call(userSettings, key)) {
+      return; // Skip dangerous or inherited properties
+    }
     settings[key] = userSettings[key];
   });
   res.json({ settings });

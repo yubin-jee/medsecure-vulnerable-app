@@ -22,16 +22,24 @@ router.post('/export', (req, res) => {
   });
 });
 
-// FIX: Path traversal (CWE-22) - sanitize filename to prevent directory traversal
+// FIX: Path traversal (CWE-22) - sanitize filename and use root option to prevent directory traversal
 router.get('/download', (req, res) => {
   const filename = path.basename(req.query.file);
-  const filePath = path.join('/reports', filename);
-  res.sendFile(filePath);
+  res.sendFile(filename, { root: '/reports' });
 });
 
-// FIX: Path traversal (CWE-22) - sanitize path to prevent directory traversal
+// FIX: Path traversal (CWE-22) - validate and sanitize path to prevent directory traversal
 router.get('/view', (req, res) => {
-  const reportName = path.basename(req.query.path);
+  const userPath = req.query.path;
+  if (typeof userPath !== 'string' || !userPath) {
+    return res.status(400).json({ error: 'Missing path parameter' });
+  }
+  // Strip directory components to get only the filename
+  const reportName = path.basename(userPath);
+  // Reject any remaining path traversal patterns
+  if (reportName.indexOf('..') !== -1 || reportName.indexOf('/') !== -1 || reportName.indexOf('\\') !== -1) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
   const resolvedPath = path.join('/reports', reportName);
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });

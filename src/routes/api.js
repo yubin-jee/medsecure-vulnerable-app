@@ -65,11 +65,15 @@ router.post('/v1/send-credentials', (req, res) => {
   request.end();
 });
 
-// VULN: Unsafe deserialization (CWE-502)
+// Safe deserialization using JSON.parse instead of eval (CWE-502, CWE-094)
 router.post('/v1/import-data', (req, res) => {
   const serializedData = req.body.data;
-  const data = eval('(' + serializedData + ')');
-  res.json({ imported: data });
+  try {
+    const data = JSON.parse(serializedData);
+    res.json({ imported: data });
+  } catch (e) {
+    res.status(400).json({ error: 'Invalid JSON data' });
+  }
 });
 
 module.exports = router;

@@ -4,16 +4,28 @@ const { execFileSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// FIXED: Command injection (CWE-78) - use execFileSync with argument array to prevent shell injection
+// FIXED: Command injection (CWE-78) - use execFileSync with argument array and input validation
+const ALLOWED_REPORT_TYPES = ['pdf', 'csv', 'html', 'json', 'xml'];
 router.get('/generate', (req, res) => {
   const reportType = req.query.type;
+  if (!reportType || !ALLOWED_REPORT_TYPES.includes(reportType)) {
+    return res.status(400).json({ error: 'Invalid report type. Allowed: ' + ALLOWED_REPORT_TYPES.join(', ') });
+  }
   const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
   res.send(output);
 });
 
-// FIXED: Command injection (CWE-78) - use execFile with argument array to prevent shell injection
+// FIXED: Command injection (CWE-78) - use execFile with argument array and input validation
+const ALLOWED_EXPORT_FORMATS = ['pdf', 'csv', 'html', 'json', 'xml'];
+const SAFE_FILENAME_PATTERN = /^[a-zA-Z0-9_][a-zA-Z0-9_.\-]*$/;
 router.post('/export', (req, res) => {
   const { filename, format } = req.body;
+  if (!filename || !SAFE_FILENAME_PATTERN.test(filename)) {
+    return res.status(400).json({ error: 'Invalid filename. Only alphanumeric characters, underscores, hyphens, and dots are allowed.' });
+  }
+  if (!format || !ALLOWED_EXPORT_FORMATS.includes(format)) {
+    return res.status(400).json({ error: 'Invalid format. Allowed: ' + ALLOWED_EXPORT_FORMATS.join(', ') });
+  }
   execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
@@ -36,10 +48,18 @@ router.get('/view', (req, res) => {
   res.json({ content });
 });
 
-// FIXED: Command injection via filename (CWE-78) - use execFileSync with argument array to prevent shell injection
+// FIXED: Command injection via filename (CWE-78) - use execFileSync with argument array and input validation
 router.post('/compress', (req, res) => {
   const { files } = req.body;
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: 'files must be a non-empty array' });
+  }
+  for (const file of files) {
+    if (typeof file !== 'string' || !SAFE_FILENAME_PATTERN.test(file)) {
+      return res.status(400).json({ error: 'Invalid filename: ' + String(file) + '. Only alphanumeric characters, underscores, hyphens, and dots are allowed.' });
+    }
+  }
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', '--', ...files]);
   res.download('/tmp/archive.tar.gz');
 });
 

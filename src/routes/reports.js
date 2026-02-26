@@ -33,15 +33,14 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - validate resolved path stays within root
+// FIX: Path traversal (CWE-22) - reject traversal sequences and absolute paths
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  const ROOT = '/reports/';
-  const resolvedPath = path.resolve(ROOT, reportPath);
-  if (!resolvedPath.startsWith(ROOT)) {
+  if (reportPath.includes('..') || path.isAbsolute(reportPath)) {
     return res.status(400).json({ error: 'Invalid file path' });
   }
-  const content = fs.readFileSync(resolvedPath, 'utf-8');
+  const filePath = path.join('/reports', reportPath);
+  const content = fs.readFileSync(filePath, 'utf-8');
   res.json({ content });
 });
 

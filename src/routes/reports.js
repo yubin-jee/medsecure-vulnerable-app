@@ -44,14 +44,59 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// VULN: Server-Side Request Forgery (CWE-918)
+// FIXED: Server-Side Request Forgery (CWE-918) - validate URL against allowlist
 const http = require('http');
+const https = require('https');
+const { URL } = require('url');
+
+const ALLOWED_EXTERNAL_HOSTS = [
+  'api.example.com',
+  'data.example.com',
+  'reports.example.com'
+];
+
+function isAllowedUrl(inputUrl) {
+  let parsed;
+  try {
+    parsed = new URL(inputUrl);
+  } catch (e) {
+    return false;
+  }
+
+  // Only allow http and https protocols
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  // Reject URLs with credentials
+  if (parsed.username || parsed.password) {
+    return false;
+  }
+
+  // Validate hostname against allowlist
+  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsed.hostname)) {
+    return false;
+  }
+
+  return true;
+}
+
 router.get('/fetch-external', (req, res) => {
   const url = req.query.url;
-  http.get(url, (response) => {
+
+  if (!url || !isAllowedUrl(url)) {
+    return res.status(400).json({ error: 'Invalid or disallowed URL. Only approved external hosts are permitted.' });
+  }
+
+  const parsed = new URL(url);
+  const client = parsed.protocol === 'https:' ? https : http;
+
+  client.get(parsed, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));
+  }).on('error', (err) => {
+    res.status(502).json({ error: 'Failed to fetch external resource.' });
   });
 });
 

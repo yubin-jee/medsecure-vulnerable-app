@@ -3,17 +3,18 @@ const router = express.Router();
 const db = require('../utils/database');
 const crypto = require('crypto');
 
-// VULN: SQL injection in API endpoint (CWE-89)
+// Fixed: Use parameterized queries to prevent SQL injection (CWE-89)
 router.get('/v1/records', (req, res) => {
   const { department, status, startDate, endDate } = req.query;
   let query = "SELECT * FROM medical_records WHERE 1=1";
+  const params = [];
 
-  if (department) query += ` AND department = '${department}'`;
-  if (status) query += ` AND status = '${status}'`;
-  if (startDate) query += ` AND created_at >= '${startDate}'`;
-  if (endDate) query += ` AND created_at <= '${endDate}'`;
+  if (department) { query += " AND department = ?"; params.push(department); }
+  if (status) { query += " AND status = ?"; params.push(status); }
+  if (startDate) { query += " AND created_at >= ?"; params.push(startDate); }
+  if (endDate) { query += " AND created_at <= ?"; params.push(endDate); }
 
-  const records = db.prepare(query).all();
+  const records = db.prepare(query).all(...params);
   res.json({ records, count: records.length });
 });
 

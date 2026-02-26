@@ -44,41 +44,40 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowlist of trusted hostnames
-const http = require('http');
+// FIX: Server-Side Request Forgery (CWE-918) - use allowlist of predefined URLs
 const https = require('https');
 
-// Allowlist mapping of permitted host identifiers to their base URLs.
-// The user supplies a host key and a path; the actual hostname is never taken from user input.
-const ALLOWED_EXTERNAL_HOSTS = {
-  'api': 'https://api.medsecure.example.com',
-  'reports': 'https://reports.medsecure.example.com',
-  'data': 'https://data.medsecure.example.com',
+// Allowlist mapping of permitted resource identifiers to their full, fixed URLs.
+// No part of the outgoing request URL is derived from user input.
+const ALLOWED_EXTERNAL_URLS = {
+  'api-status':    'https://api.medsecure.example.com/status',
+  'api-reports':   'https://api.medsecure.example.com/reports',
+  'reports-latest': 'https://reports.medsecure.example.com/latest',
+  'reports-summary': 'https://reports.medsecure.example.com/summary',
+  'data-export':   'https://data.medsecure.example.com/export',
+  'data-metrics':  'https://data.medsecure.example.com/metrics',
 };
 
 router.get('/fetch-external', (req, res) => {
-  const hostKey = req.query.host;
-  const resourcePath = req.query.path || '/';
+  const resourceKey = req.query.resource;
 
-  if (!hostKey || typeof hostKey !== 'string') {
-    return res.status(400).json({ error: 'Missing or invalid host parameter. Use one of: ' + Object.keys(ALLOWED_EXTERNAL_HOSTS).join(', ') });
+  if (!resourceKey || typeof resourceKey !== 'string') {
+    return res.status(400).json({
+      error: 'Missing or invalid resource parameter.',
+      allowed: Object.keys(ALLOWED_EXTERNAL_URLS),
+    });
   }
 
-  // Look up the base URL from the allowlist — the hostname is never derived from user input
-  const baseUrl = ALLOWED_EXTERNAL_HOSTS[hostKey];
-  if (!baseUrl) {
-    return res.status(403).json({ error: 'Requested host key is not in the allowed list. Use one of: ' + Object.keys(ALLOWED_EXTERNAL_HOSTS).join(', ') });
+  // Look up the full URL from the allowlist — no user input is used in the URL
+  const targetUrl = ALLOWED_EXTERNAL_URLS[resourceKey];
+  if (!targetUrl) {
+    return res.status(403).json({
+      error: 'Requested resource is not in the allowed list.',
+      allowed: Object.keys(ALLOWED_EXTERNAL_URLS),
+    });
   }
 
-  // Sanitize the path to prevent path traversal
-  const sanitizedPath = resourcePath.replace(/\.\./g, '').replace(/\/\//g, '/');
-
-  // Construct the full URL from trusted base + sanitized path (no user-controlled hostname)
-  const targetUrl = new URL(sanitizedPath, baseUrl);
-  const safeUrl = targetUrl.href;
-
-  const client = targetUrl.protocol === 'https:' ? https : http;
-  client.get(safeUrl, (response) => {
+  https.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

@@ -16,11 +16,12 @@ function isSafeFilename(str) {
 }
 
 router.get('/generate', (req, res) => {
-  const reportType = req.query.type;
-  if (!ALLOWED_REPORT_TYPES.includes(reportType)) {
+  const reportTypeIndex = ALLOWED_REPORT_TYPES.indexOf(req.query.type);
+  if (reportTypeIndex === -1) {
     return res.status(400).json({ error: 'Invalid report type' });
   }
-  const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
+  const safeReportType = ALLOWED_REPORT_TYPES[reportTypeIndex];
+  const output = execFileSync('generate-report', ['--type', safeReportType, '--format', 'pdf']);
   res.send(output);
 });
 
@@ -29,10 +30,14 @@ router.post('/export', (req, res) => {
   if (!isSafeFilename(filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
-  if (!ALLOWED_EXPORT_FORMATS.includes(format)) {
+  const formatIndex = ALLOWED_EXPORT_FORMATS.indexOf(format);
+  if (formatIndex === -1) {
     return res.status(400).json({ error: 'Invalid export format' });
   }
-  execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
+  // Use sanitized filename (strip to basename) and derive format from allowlist
+  const safeFilename = path.basename(filename);
+  const safeFormat = ALLOWED_EXPORT_FORMATS[formatIndex];
+  execFile('convert-data', [safeFilename, '--output-format', safeFormat], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -59,12 +64,15 @@ router.post('/compress', (req, res) => {
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'Files must be a non-empty array' });
   }
+  // Sanitize each filename: strip path components and validate characters
+  const safeFiles = [];
   for (const file of files) {
     if (!isSafeFilename(file)) {
       return res.status(400).json({ error: 'Invalid filename in list' });
     }
+    safeFiles.push(path.basename(String(file)));
   }
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...safeFiles]);
   res.download('/tmp/archive.tar.gz');
 });
 

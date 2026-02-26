@@ -4,46 +4,30 @@ const { execFileSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Allowlist of valid report types
-const ALLOWED_REPORT_TYPES = ['summary', 'detailed', 'audit', 'compliance', 'financial'];
+// Only allow safe alphanumeric values with hyphens for command arguments
+const SAFE_ARG_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
-// Allowlist of valid export formats
-const ALLOWED_EXPORT_FORMATS = ['csv', 'json', 'xml', 'pdf', 'xlsx'];
-
-// Validate and return a sanitized filename containing only safe characters.
-// Returns the matched string (derived from the regex match, not the original
-// input) so that taint tracking treats the result as safe.
-function sanitizeFilename(name) {
-  if (typeof name !== 'string') return null;
-  const match = name.match(/^[a-zA-Z0-9._-]+$/);
-  return match ? match[0] : null;
-}
+// Only allow safe filename characters (alphanumeric, dots, hyphens, underscores)
+const SAFE_FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
 router.get('/generate', (req, res) => {
   const reportType = req.query.type;
-  const idx = ALLOWED_REPORT_TYPES.indexOf(reportType);
-  if (idx === -1) {
+  if (typeof reportType !== 'string' || !SAFE_ARG_PATTERN.test(reportType)) {
     return res.status(400).json({ error: 'Invalid report type' });
   }
-  // Use the value from the allowlist to break the taint flow from user input
-  const safeType = ALLOWED_REPORT_TYPES[idx];
-  const output = execFileSync('generate-report', ['--type', safeType, '--format', 'pdf']);
+  const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
   res.send(output);
 });
 
 router.post('/export', (req, res) => {
   const { filename, format } = req.body;
-  const safeFilename = sanitizeFilename(filename);
-  if (!safeFilename) {
+  if (typeof filename !== 'string' || !SAFE_FILENAME_PATTERN.test(filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
-  const fmtIdx = ALLOWED_EXPORT_FORMATS.indexOf(format);
-  if (fmtIdx === -1) {
+  if (typeof format !== 'string' || !SAFE_ARG_PATTERN.test(format)) {
     return res.status(400).json({ error: 'Invalid export format' });
   }
-  // Use sanitized/allowlisted values to break the taint flow from user input
-  const safeFormat = ALLOWED_EXPORT_FORMATS[fmtIdx];
-  execFile('convert-data', [safeFilename, '--output-format', safeFormat], (err, stdout) => {
+  execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -70,12 +54,12 @@ router.post('/compress', (req, res) => {
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'Files must be a non-empty array' });
   }
-  // Sanitize each filename to break the taint flow from user input
-  const safeFiles = files.map(sanitizeFilename);
-  if (safeFiles.some((f) => f === null)) {
-    return res.status(400).json({ error: 'Invalid filename in list' });
+  for (const file of files) {
+    if (typeof file !== 'string' || !SAFE_FILENAME_PATTERN.test(file)) {
+      return res.status(400).json({ error: 'Invalid filename in list' });
+    }
   }
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...safeFiles]);
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
   res.download('/tmp/archive.tar.gz');
 });
 

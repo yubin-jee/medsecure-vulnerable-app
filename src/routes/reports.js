@@ -57,8 +57,9 @@ const ALLOWED_HOSTS = {
 };
 
 router.get('/fetch-external', (req, res) => {
-  const hostKey = req.query.host;
-  const resourcePath = req.query.path;
+  // Ensure query parameters are strings (prevent type confusion from array params)
+  const hostKey = typeof req.query.host === 'string' ? req.query.host : '';
+  const resourcePath = typeof req.query.path === 'string' ? req.query.path : '';
 
   // Look up the base URL from the allowlist using a non-tainted key
   const baseUrl = ALLOWED_HOSTS[hostKey];

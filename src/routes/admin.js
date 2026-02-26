@@ -51,18 +51,15 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// Prototype pollution prevention: validate keys and use a prototype-less object
-const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype', 'toString', 'valueOf', 'hasOwnProperty']);
-
+// Use Map to avoid prototype pollution (CWE-1321) and remote property injection
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = Object.create(null);
-  Object.keys(userSettings).forEach(key => {
-    if (typeof key === 'string' && !DANGEROUS_KEYS.has(key) && !key.startsWith('__')) {
-      settings[key] = userSettings[key];
-    }
-  });
-  res.json({ settings });
+  const settings = new Map();
+  for (const key of Object.keys(userSettings)) {
+    settings.set(key, userSettings[key]);
+  }
+  // Convert Map to plain object for JSON response
+  res.json({ settings: Object.fromEntries(settings) });
 });
 
 module.exports = router;

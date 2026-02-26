@@ -51,12 +51,16 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// VULN: Prototype pollution via merge (CWE-1321)
+// FIX: Prevent prototype pollution by using a null-prototype object
+// and rejecting dangerous property names (CodeQL alert #40)
+const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = {};
+  const settings = Object.create(null);
   Object.keys(userSettings).forEach(key => {
-    settings[key] = userSettings[key];
+    if (!BLOCKED_KEYS.has(key)) {
+      settings[key] = userSettings[key];
+    }
   });
   res.json({ settings });
 });

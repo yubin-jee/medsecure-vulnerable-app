@@ -1,10 +1,21 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const db = require('../utils/database');
 const crypto = require('crypto');
 
+// Rate limiter for database-accessing endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
 // Fixed: Use parameterized queries to prevent SQL injection (CWE-89)
-router.get('/v1/records', (req, res) => {
+// Rate-limited to prevent abuse of database-accessing endpoint
+router.get('/v1/records', apiLimiter, (req, res) => {
   const { department, status, startDate, endDate } = req.query;
   let query = "SELECT * FROM medical_records WHERE 1=1";
   const params = [];

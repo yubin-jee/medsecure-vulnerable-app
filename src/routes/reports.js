@@ -8,10 +8,12 @@ const path = require('path');
 const ALLOWED_REPORT_TYPES = ['pdf', 'csv', 'html', 'json', 'xml'];
 router.get('/generate', (req, res) => {
   const reportType = req.query.type;
-  if (!reportType || !ALLOWED_REPORT_TYPES.includes(reportType)) {
+  const typeIndex = ALLOWED_REPORT_TYPES.indexOf(reportType);
+  if (!reportType || typeIndex === -1) {
     return res.status(400).json({ error: 'Invalid report type. Allowed: ' + ALLOWED_REPORT_TYPES.join(', ') });
   }
-  const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
+  const safeReportType = ALLOWED_REPORT_TYPES[typeIndex];
+  const output = execFileSync('generate-report', ['--type', safeReportType, '--format', 'pdf']);
   res.send(output);
 });
 
@@ -23,10 +25,14 @@ router.post('/export', (req, res) => {
   if (!filename || !SAFE_FILENAME_PATTERN.test(filename)) {
     return res.status(400).json({ error: 'Invalid filename. Only alphanumeric characters, underscores, hyphens, and dots are allowed.' });
   }
-  if (!format || !ALLOWED_EXPORT_FORMATS.includes(format)) {
+  const formatIndex = ALLOWED_EXPORT_FORMATS.indexOf(format);
+  if (!format || formatIndex === -1) {
     return res.status(400).json({ error: 'Invalid format. Allowed: ' + ALLOWED_EXPORT_FORMATS.join(', ') });
   }
-  execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
+  // Derive safe values from constants/validated match to break taint chain
+  const safeFilename = filename.match(SAFE_FILENAME_PATTERN)[0];
+  const safeFormat = ALLOWED_EXPORT_FORMATS[formatIndex];
+  execFile('convert-data', [safeFilename, '--output-format', safeFormat], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -54,12 +60,15 @@ router.post('/compress', (req, res) => {
   if (!Array.isArray(files) || files.length === 0) {
     return res.status(400).json({ error: 'files must be a non-empty array' });
   }
+  // Validate and derive safe filenames to break taint chain
+  const safeFiles = [];
   for (const file of files) {
     if (typeof file !== 'string' || !SAFE_FILENAME_PATTERN.test(file)) {
       return res.status(400).json({ error: 'Invalid filename: ' + String(file) + '. Only alphanumeric characters, underscores, hyphens, and dots are allowed.' });
     }
+    safeFiles.push(file.match(SAFE_FILENAME_PATTERN)[0]);
   }
-  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', '--', ...files]);
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', '--', ...safeFiles]);
   res.download('/tmp/archive.tar.gz');
 });
 

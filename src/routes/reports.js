@@ -22,17 +22,26 @@ router.post('/export', (req, res) => {
   });
 });
 
-// VULN: Path traversal (CWE-22) - user controls file path
+// FIX: Path traversal (CWE-22) - validate resolved path stays within root
 router.get('/download', (req, res) => {
   const filename = req.query.file;
-  const filePath = path.join('/reports', filename);
+  const rootDir = '/reports';
+  const filePath = path.resolve(rootDir, filename);
+  if (!filePath.startsWith(rootDir + path.sep) && filePath !== rootDir) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
   res.sendFile(filePath);
 });
 
-// VULN: Path traversal (CWE-22) - reading arbitrary files
+// FIX: Path traversal (CWE-22) - validate resolved path stays within root
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  const content = fs.readFileSync(reportPath, 'utf-8');
+  const rootDir = '/reports';
+  const resolvedPath = path.resolve(rootDir, reportPath);
+  if (!resolvedPath.startsWith(rootDir + path.sep) && resolvedPath !== rootDir) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
+  const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });
 

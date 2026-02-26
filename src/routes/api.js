@@ -25,10 +25,17 @@ router.post('/v1/validate-email', (req, res) => {
   res.json({ valid: isValid });
 });
 
-// VULN: Log injection (CWE-117)
+// Sanitize user input for safe logging by removing control characters
+function sanitizeLogInput(str) {
+  if (typeof str !== 'string') return String(str);
+  return str.replace(/[\r\n\t\x00-\x1F\x7F]/g, '');
+}
+
 router.post('/v1/audit-log', (req, res) => {
   const { action, userId } = req.body;
-  console.log(`[AUDIT] User ${userId} performed action: ${action}`);
+  const safeUserId = sanitizeLogInput(userId);
+  const safeAction = sanitizeLogInput(action);
+  console.log(`[AUDIT] User ${safeUserId} performed action: ${safeAction}`);
   res.json({ logged: true });
 });
 

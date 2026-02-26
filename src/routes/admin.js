@@ -51,12 +51,20 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// VULN: Prototype pollution via merge (CWE-1321)
+// Prototype pollution prevention: reject dangerous property names and use a prototype-less object
+const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype', 'toString', 'valueOf', '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__']);
+
+function isSafeKey(key) {
+  return typeof key === 'string' && !BLOCKED_KEYS.has(key);
+}
+
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = {};
+  const settings = Object.create(null);
   Object.keys(userSettings).forEach(key => {
-    settings[key] = userSettings[key];
+    if (isSafeKey(key)) {
+      settings[key] = userSettings[key];
+    }
   });
   res.json({ settings });
 });

@@ -33,21 +33,14 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - normalize and validate path within root
+// FIX: Path traversal (CWE-22) - sanitize path with path.basename
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
   if (!reportPath) {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
-  const rootDir = '/reports';
-  const normalizedPath = path.normalize(reportPath);
-  if (normalizedPath.includes('..')) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  const resolvedPath = path.join(rootDir, normalizedPath);
-  if (!resolvedPath.startsWith(rootDir + path.sep)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
+  const sanitizedFilename = path.basename(reportPath);
+  const resolvedPath = path.join('/reports', sanitizedFilename);
   const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });

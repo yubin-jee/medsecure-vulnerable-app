@@ -51,19 +51,15 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// FIX: Use Object.create(null) to avoid prototype chain, and validate property names
-// to prevent prototype pollution (CWE-1321, CWE-250, CWE-400)
-const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
+// FIX: Use Map to store user settings, preventing prototype pollution (CWE-1321, CWE-250, CWE-400).
+// Map.set() does not write to object prototypes, avoiding remote property injection.
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = Object.create(null);
-  Object.keys(userSettings).forEach(key => {
-    if (!FORBIDDEN_KEYS.has(key) && Object.prototype.hasOwnProperty.call(userSettings, key)) {
-      settings[key] = userSettings[key];
-    }
-  });
-  res.json({ settings });
+  const settingsMap = new Map();
+  for (const key of Object.keys(userSettings)) {
+    settingsMap.set(key, userSettings[key]);
+  }
+  res.json({ settings: Object.fromEntries(settingsMap) });
 });
 
 module.exports = router;

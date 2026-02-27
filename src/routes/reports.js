@@ -3,6 +3,18 @@ const router = express.Router();
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+
+const REPORTS_ROOT = path.resolve('/reports');
+
+// Rate limiter for filesystem-access routes
+const fsRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' }
+});
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -23,28 +35,27 @@ router.post('/export', (req, res) => {
 });
 
 // FIX: Path traversal (CWE-22) - validate resolved path stays within root
-router.get('/download', (req, res) => {
+router.get('/download', fsRateLimiter, (req, res) => {
   const filename = req.query.file;
   if (!filename) {
     return res.status(400).json({ error: 'Missing file parameter' });
   }
-  const rootDir = path.resolve('/reports');
-  const filePath = path.resolve(rootDir, filename);
-  if (!filePath.startsWith(rootDir + path.sep) && filePath !== rootDir) {
+  const filePath = path.resolve(REPORTS_ROOT, filename);
+  if (!filePath.startsWith(REPORTS_ROOT + path.sep)) {
     return res.status(403).json({ error: 'Access denied' });
   }
   res.sendFile(filePath);
 });
 
 // FIX: Path traversal (CWE-22) - validate resolved path stays within root
-router.get('/view', (req, res) => {
+// FIX: Rate limiting added to prevent abuse of filesystem access
+router.get('/view', fsRateLimiter, (req, res) => {
   const reportPath = req.query.path;
   if (!reportPath) {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
-  const rootDir = path.resolve('/reports');
-  const resolvedPath = path.resolve(rootDir, reportPath);
-  if (!resolvedPath.startsWith(rootDir + path.sep) && resolvedPath !== rootDir) {
+  const resolvedPath = path.resolve(REPORTS_ROOT, reportPath);
+  if (!resolvedPath.startsWith(REPORTS_ROOT + path.sep)) {
     return res.status(403).json({ error: 'Access denied' });
   }
   const content = fs.readFileSync(resolvedPath, 'utf-8');

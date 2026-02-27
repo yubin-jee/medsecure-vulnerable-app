@@ -3,6 +3,7 @@ const router = express.Router();
 const { execSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
@@ -34,14 +35,22 @@ router.get('/download', (req, res) => {
   res.sendFile(filePath);
 });
 
-// FIX: Path traversal (CWE-22) - validate resolved path stays within root
-router.get('/view', (req, res) => {
+// FIX: Path traversal (CWE-22) + rate limiting - validate path and limit requests
+const viewRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: { error: 'Too many requests, please try again later' }
+});
+
+router.get('/view', viewRateLimiter, (req, res) => {
   const reportPath = req.query.path;
-  const resolvedPath = path.resolve(REPORTS_ROOT, reportPath);
-  if (!resolvedPath.startsWith(REPORTS_ROOT + path.sep) && resolvedPath !== REPORTS_ROOT) {
-    return res.status(400).json({ error: 'Invalid file path' });
+  if (!reportPath || typeof reportPath !== 'string') {
+    return res.status(400).json({ error: 'Missing file path' });
   }
-  const content = fs.readFileSync(resolvedPath, 'utf-8');
+  // Sanitize: strip directory traversal sequences and use only the basename
+  const safeName = path.basename(reportPath);
+  const safePath = path.join(REPORTS_ROOT, safeName);
+  const content = fs.readFileSync(safePath, 'utf-8');
   res.json({ content });
 });
 

@@ -2,7 +2,27 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const db = require('../utils/database');
+
+// Rate limiters for auth endpoints
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 login attempts per window
+  message: { error: 'Too many login attempts, please try again later' }
+});
+
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5, // limit each IP to 5 reset requests per window
+  message: { error: 'Too many password reset requests, please try again later' }
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // limit each IP to 10 registrations per window
+  message: { error: 'Too many registration attempts, please try again later' }
+});
 
 // VULN: Hardcoded credentials (CWE-798)
 const JWT_SECRET = 'supersecretkey123';
@@ -10,7 +30,7 @@ const ADMIN_PASSWORD = 'admin123!';
 const DB_PASSWORD = 'postgres://admin:password123@db.medsecure.internal:5432/patients';
 
 // VULN: SQL Injection in login (CWE-89)
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   const { username, password } = req.body;
   const query = `SELECT * FROM users WHERE username = ? AND password = ?`;
   const user = db.prepare(query).get(username, password);
@@ -35,7 +55,7 @@ router.post('/login', (req, res) => {
 });
 
 // VULN: Insecure randomness (CWE-330) - Math.random for password reset token
-router.post('/reset-password', (req, res) => {
+router.post('/reset-password', resetPasswordLimiter, (req, res) => {
   const { email } = req.body;
   const resetToken = Math.random().toString(36).substring(2);
   const expiry = Date.now() + 3600000;
@@ -52,7 +72,7 @@ router.get('/users', (req, res) => {
 });
 
 // VULN: Cleartext storage of password (CWE-312)
-router.post('/register', (req, res) => {
+router.post('/register', registerLimiter, (req, res) => {
   const { username, password, email } = req.body;
   db.prepare(`INSERT INTO users (username, password, email) VALUES (?, ?, ?)`).run(username, password, email);
   res.json({ message: 'User registered' });

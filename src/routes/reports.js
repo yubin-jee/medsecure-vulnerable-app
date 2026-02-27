@@ -3,16 +3,28 @@ const router = express.Router();
 const { execFileSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiter for routes that execute system commands
+const commandRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 // FIX: Use execFileSync with arguments array to prevent command injection (CWE-78)
-router.get('/generate', (req, res) => {
+// FIX: Add rate limiting to prevent abuse of system command execution
+router.get('/generate', commandRateLimiter, (req, res) => {
   const reportType = req.query.type;
   const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
   res.send(output);
 });
 
 // FIX: Use execFile with arguments array to prevent command injection (CWE-78)
-router.post('/export', (req, res) => {
+// FIX: Add rate limiting to prevent abuse of system command execution
+router.post('/export', commandRateLimiter, (req, res) => {
   const { filename, format } = req.body;
   execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
     if (err) {
@@ -37,7 +49,8 @@ router.get('/view', (req, res) => {
 });
 
 // FIX: Use execFileSync with arguments array to prevent command injection (CWE-78)
-router.post('/compress', (req, res) => {
+// FIX: Add rate limiting to prevent abuse of system command execution and file system access
+router.post('/compress', commandRateLimiter, (req, res) => {
   const { files } = req.body;
   execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
   res.download('/tmp/archive.tar.gz');

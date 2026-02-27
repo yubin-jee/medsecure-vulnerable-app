@@ -17,7 +17,7 @@ from dispatch import DevinSession, get_session_status, send_message
 logger = logging.getLogger(__name__)
 
 
-    # Map Devin API statuses to our internal statuses
+# Map Devin API statuses to our internal statuses
 STATUS_MAP = {
     "running": "running",
     "working": "running",  # Devin uses "working" for active sessions

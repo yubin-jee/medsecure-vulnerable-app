@@ -46,6 +46,30 @@
         .topbar .right { font-size: 12px; color: var(--text-2); }
         .topbar .right a { color: var(--blue); text-decoration: none; margin-left: 8px; }
 
+        /* Tabs */
+        .tab-bar {
+            background: var(--bg-1);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            display: flex;
+            gap: 0;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-2);
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: color .15s, border-color .15s;
+        }
+        .tab-btn:hover { color: var(--text-1); }
+        .tab-btn.active { color: var(--text-0); border-bottom-color: var(--blue); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
         /* Container */
         .wrap { max-width: 1360px; margin: 0 auto; padding: 20px 32px; }
 
@@ -188,6 +212,22 @@
         .action-row:last-child { border-bottom: none; }
         .action-row .links a { margin-left: 12px; font-size: 12px; }
 
+        /* Confidence badges */
+        .conf-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .conf-high { background: rgba(63,185,80,.12); color: var(--green); }
+        .conf-medium { background: rgba(227,179,65,.12); color: var(--yellow); }
+        .conf-low { background: rgba(248,81,73,.12); color: var(--red); }
+
         /* Vuln list in sidebar */
         .vuln-row {
             display: flex;
@@ -320,6 +360,14 @@
         </div>
     </div>
 
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('leadership')">Leadership</button>
+        <button class="tab-btn" onclick="switchTab('operations')">Operations</button>
+    </div>
+
+    <!-- ============ LEADERSHIP TAB ============ -->
+    <div id="tab-leadership" class="tab-panel active">
     <div class="wrap">
 
         <!-- Pipeline Status -->
@@ -447,56 +495,6 @@
             </div>
         </div>
 
-        <!-- Section Divider -->
-        <hr class="section-divider">
-        <div class="section-label">Operations</div>
-
-        <!-- Action items -->
-        {% set needs_action = [] %}
-        {% for s in sessions %}
-            {% if s.status == 'review_ready' %}
-                {% if needs_action.append(s) %}{% endif %}
-            {% elif s.status == 'needs_human_review' %}
-                {% if needs_action.append(s) %}{% endif %}
-            {% elif s.status == 'failed' %}
-                {% if needs_action.append(s) %}{% endif %}
-            {% elif s.status == 'finished' and s.pr_url %}
-                {% if needs_action.append(s) %}{% endif %}
-            {% endif %}
-        {% endfor %}
-        {% if needs_action %}
-        <div class="card action-card" style="margin-bottom: 16px;">
-            <div class="card-hd">
-                Action Required
-                <span class="sub" style="color: var(--orange);">{{ needs_action | length }} item(s)</span>
-            </div>
-            <div class="card-bd">
-                {% for s in needs_action %}
-                <div class="action-row">
-                    <div>
-                        {% if s.status == 'review_ready' %}
-                        <span class="badge b-done">ready to merge</span>
-                        {% elif s.status == 'needs_human_review' %}
-                        <span class="badge b-warn">needs review</span>
-                        {% elif s.status == 'finished' %}
-                        <span class="badge b-done">PR ready</span>
-                        {% else %}
-                        <span class="badge b-fail">failed</span>
-                        {% endif %}
-                        <span style="margin-left: 6px;">
-                            {{ s.get('description', '') or s.batch_id }}
-                        </span>
-                    </div>
-                    <div class="links">
-                        {% if s.pr_url %}<a href="{{ s.pr_url }}" target="_blank">Review PR</a>{% endif %}
-                        {% if s.url %}<a href="{{ s.url }}" target="_blank">Devin</a>{% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
         <!-- Chart + Severity -->
         <div class="row row-2">
             <div class="card">
@@ -545,6 +543,66 @@
             </div>
         </div>
 
+    </div>
+    </div>
+
+    <!-- ============ OPERATIONS TAB ============ -->
+    <div id="tab-operations" class="tab-panel">
+    <div class="wrap">
+
+        <!-- Action items (sorted: low confidence first, then medium, then high) -->
+        {% set needs_action = [] %}
+        {% for s in sessions %}
+            {% if s.status == 'review_ready' %}
+                {% if needs_action.append(s) %}{% endif %}
+            {% elif s.status == 'needs_human_review' %}
+                {% if needs_action.append(s) %}{% endif %}
+            {% elif s.status == 'failed' %}
+                {% if needs_action.append(s) %}{% endif %}
+            {% elif s.status == 'finished' and s.pr_url %}
+                {% if needs_action.append(s) %}{% endif %}
+            {% endif %}
+        {% endfor %}
+        {% set conf_order = {'low': 0, 'medium': 1, 'high': 2} %}
+        {% set needs_action_sorted = needs_action | sort(attribute='confidence_order') %}
+        {% if needs_action_sorted %}
+        <div class="card action-card" style="margin-bottom: 16px;">
+            <div class="card-hd">
+                Action Required
+                <span class="sub" style="color: var(--orange);">{{ needs_action_sorted | length }} item(s)</span>
+            </div>
+            <div class="card-bd">
+                {% for s in needs_action_sorted %}
+                <div class="action-row">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        {% if s.status == 'review_ready' %}
+                        <span class="badge b-done">ready to merge</span>
+                        {% elif s.status == 'needs_human_review' %}
+                        <span class="badge b-warn">needs review</span>
+                        {% elif s.status == 'finished' %}
+                        <span class="badge b-done">PR ready</span>
+                        {% else %}
+                        <span class="badge b-fail">failed</span>
+                        {% endif %}
+                        {% set conf = s.get('confidence', 'high') %}
+                        <span class="conf-badge conf-{{ conf }}">{{ conf }}</span>
+                        <span>
+                            {{ s.get('description', '') or s.batch_id }}
+                        </span>
+                    </div>
+                    <div class="links">
+                        {% if s.get('retry_count', 0) > 0 %}
+                        <span style="font-size: 11px; color: var(--text-2);">{{ s.retry_count }} retry{{ 'ies' if s.retry_count > 1 else '' }}</span>
+                        {% endif %}
+                        {% if s.pr_url %}<a href="{{ s.pr_url }}" target="_blank">Review PR</a>{% endif %}
+                        {% if s.url %}<a href="{{ s.url }}" target="_blank">Devin</a>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Sessions -->
         <div class="card" style="margin-bottom: 16px;">
             <div class="card-hd">
@@ -564,6 +622,7 @@
                             <th>Severity</th>
                             <th>File</th>
                             <th>Alerts</th>
+                            <th>Confidence</th>
                             <th>Status</th>
                             <th>PR</th>
                             <th></th>
@@ -588,6 +647,19 @@
                             </td>
                             <td>
                                 {{ s.alert_numbers | length }}
+                            </td>
+                            <td>
+                                {% set conf = s.get('confidence', 'high') %}
+                                {% if s.pr_url %}
+                                <span class="conf-badge conf-{{ conf }}">{{ conf }}</span>
+                                {% if s.get('retry_count', 0) > 0 %}
+                                <div style="font-size: 10px; color: var(--text-2); margin-top: 2px;">
+                                    {{ s.retry_count }} retry{{ 'ies' if s.retry_count > 1 else '' }}
+                                </div>
+                                {% endif %}
+                                {% else %}
+                                <span style="color: var(--text-2);">&mdash;</span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if s.status in ('running', 'working') %}
@@ -665,8 +737,18 @@
         {% endif %}
 
     </div>
+    </div>
 
     <script>
+        // Tab switching
+        function switchTab(name) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Burndown chart
         const hist = {{ history | tojson }};
         const labels = hist.length
             ? hist.map(h => new Date(h.timestamp).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}))
@@ -694,7 +776,7 @@
             }
         });
 
-        setTimeout(()=>location.reload(), 30000);
+        setTimeout(()=>location.reload(), 90000);
     </script>
 </body>
 </html>

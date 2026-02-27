@@ -1,17 +1,15 @@
 """
 SecureFlow Orchestrator - Slack Notification Module
 
-Routes notifications to the right channel with the right audience:
-
-#security  — Critical/high fix completions, needs-human-review, failed sessions
-#engineering — PR review requests (one per PR, targeted)
-#all       — Weekly burndown summary for management (not per-run spam)
+Two-channel strategy:
+  #security   = Command Center — sees the full autonomous lifecycle
+  #engineering = Action Inbox  — only sees "review this PR"
 
 Design principles:
-- Never send the full scan summary every run. Only on first scan or when counts change significantly.
-- PR notifications go to #engineering only.
-- Security-relevant events (failures, human review needed) go to #security only.
-- Management gets a weekly digest, not real-time noise.
+- #security sees: scan report, retries (self-healing), resolutions, failures
+- #engineering sees: only PRs that need a human to click "merge"
+- Confidence scoring on PR review requests helps engineers prioritize
+- One notification per event per session (deduped by caller via notified_sessions)
 """
 
 from __future__ import annotations
@@ -21,7 +19,6 @@ import logging
 from datetime import datetime
 from typing import Optional
 from config import Config
-from ingest import CodeQLAlert
 from dispatch import DevinSession
 
 logger = logging.getLogger(__name__)
@@ -35,11 +32,13 @@ def _send(webhook_url: str, blocks: list[dict]) -> bool:
         logger.warning("No webhook URL provided. Skipping.")
         return False
     try:
-        resp = requests.post(webhook_url, json={"blocks": blocks})
+        resp = requests.post(webhook_url, json={"blocks": blocks}, timeout=10)
         resp.raise_for_status()
         return True
     except requests.exceptions.RequestException as e:
         logger.error(f"Slack send failed: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"Slack response body: {e.response.text[:200]}")
         return False
 
 
@@ -66,13 +65,17 @@ def send_to(config: Config, channel: str, blocks: list[dict]) -> bool:
     return ok
 
 
-# --- #security channel ---
+# ---------------------------------------------------------------------------
+# #security channel — "Command Center"
+#
+# Security team sees the full autonomous lifecycle:
+#   scan report → retry (self-healing) → resolved → failures
+# ---------------------------------------------------------------------------
 
 def notify_initial_scan(config: Config, summary: dict) -> bool:
     """
-    Send once when SecureFlow first connects to a repo.
-    NOT sent on every run — only when there are genuinely new alerts
-    the security team hasn't seen.
+    #security — Sent once when SecureFlow first connects to a repo.
+    Shows the scope of the problem and that autonomous remediation has begun.
     """
     sev_lines = []
     for sev, emoji in [("critical", ":red_circle:"), ("high", ":large_orange_circle:"),
@@ -82,7 +85,7 @@ def notify_initial_scan(config: Config, summary: dict) -> bool:
             sev_lines.append(f"{emoji} {sev.upper()}: {count}")
 
     top_rules = sorted(summary["by_rule"].items(), key=lambda x: -x[1])[:5]
-    rules_text = "\n".join(f"• {rule}: {count}" for rule, count in top_rules)
+    rules_text = "\n".join(f"  {rule}: {count}" for rule, count in top_rules)
 
     blocks = [
         {
@@ -94,25 +97,20 @@ def notify_initial_scan(config: Config, summary: dict) -> bool:
             "text": {
                 "type": "mrkdwn",
                 "text": (
-                    f"*{summary['total']} open CodeQL alerts* in "
+                    f"*{summary['total']} open CodeQL alerts* detected in "
                     f"`{config.github_owner}/{config.github_repo}`\n\n"
                     + "\n".join(sev_lines)
+                    + f"\n\n*Top vulnerability categories:*\n{rules_text}"
                 ),
             },
         },
         {"type": "divider"},
         {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*Top categories:*\n{rules_text}",
-            },
-        },
-        {
             "type": "context",
             "elements": [{"type": "mrkdwn", "text": (
-                "SecureFlow is now actively remediating these alerts via Devin. "
-                "You'll receive targeted notifications as fixes are completed."
+                "SecureFlow is dispatching the highest-priority batches to Devin for "
+                "autonomous remediation. You'll be notified as fixes are verified and "
+                "ready for engineer review."
             )}],
         },
     ]
@@ -128,8 +126,10 @@ def notify_needs_human_review(
 ) -> bool:
     """
     #security — A PR has a failing CodeQL check that Devin can't resolve.
-    Needs a human to review whether it's a false positive or out-of-scope alert.
+    Needs a human to determine if it's a false positive or pre-existing alert.
     """
+    pr_num = session.pr_url.rstrip("/").split("/")[-1] if session.pr_url else "?"
+
     blocks = [
         {
             "type": "header",
@@ -140,13 +140,12 @@ def notify_needs_human_review(
             "text": {
                 "type": "mrkdwn",
                 "text": (
-                    f"Devin completed a fix but the CodeQL check is still failing "
-                    f"due to an issue outside the fix scope.\n\n"
-                    f"*Fix:* {batch_description}\n"
-                    f"*PR:* <{session.pr_url}|View PR>\n"
+                    f"Devin's fix for *{batch_description}* is complete, but a "
+                    f"CodeQL check is failing due to an issue outside the fix scope.\n\n"
+                    f"*PR:* <{session.pr_url}|#{pr_num}>\n"
                     f"*Reason:* {reason}\n\n"
-                    f"A security engineer should review the PR and either merge "
-                    f"(if the remaining alert is unrelated) or dismiss the false positive."
+                    f"A security engineer should review and either merge "
+                    f"(if the failing alert is unrelated) or dismiss the false positive."
                 ),
             },
         },
@@ -169,7 +168,7 @@ def notify_needs_human_review(
 def notify_session_failed(
     config: Config, session: DevinSession, batch_description: str
 ) -> bool:
-    """#security — Devin couldn't fix this, needs manual remediation."""
+    """#security — Devin couldn't fix this vulnerability. Needs manual remediation."""
     blocks = [
         {
             "type": "header",
@@ -180,11 +179,10 @@ def notify_session_failed(
             "text": {
                 "type": "mrkdwn",
                 "text": (
-                    f"Devin was unable to automatically fix:\n\n"
-                    f"*Issue:* {batch_description}\n"
+                    f"Devin was unable to automatically fix *{batch_description}*.\n\n"
                     f"*Alerts:* {', '.join(f'#{n}' for n in session.alert_numbers)}\n"
                     f"*Error:* {session.error or 'Session did not complete'}\n\n"
-                    f"This needs to be assigned to an engineer for manual fix."
+                    f"This needs to be assigned to an engineer for manual remediation."
                 ),
             },
         },
@@ -200,26 +198,73 @@ def notify_retry_sent(
     remaining_alerts: int,
 ) -> bool:
     """
-    #security — A PR had failing CodeQL checks and Devin has been
-    sent a retry to fix the remaining issues.
+    #security — A PR failed CodeQL re-check. Devin is auto-retrying.
+    This is the "self-healing" moment — shows the system catches its own mistakes.
     """
     pr_num = session.pr_url.rstrip("/").split("/")[-1] if session.pr_url else "?"
 
     blocks = [
         {
             "type": "header",
-            "text": {"type": "plain_text", "text": f"PR #{pr_num} — CodeQL Failing, Retry Sent"},
+            "text": {"type": "plain_text", "text": f"Auto-Retry: PR #{pr_num} Failed CodeQL"},
         },
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
                 "text": (
-                    f"Devin's PR has {remaining_alerts} failing CodeQL check(s). "
-                    f"A retry message has been sent automatically.\n\n"
-                    f"*Fix:* {batch_description}\n"
-                    f"*PR:* <{session.pr_url}|View PR #{pr_num}>\n"
+                    f"Devin's fix for *{batch_description}* introduced "
+                    f"{remaining_alerts} new CodeQL finding(s). "
+                    f"A retry has been sent automatically.\n\n"
+                    f"*PR:* <{session.pr_url}|#{pr_num}>\n"
+                    f"*Retry #:* {session.retry_count}\n"
                     f"*Devin:* <{session.url}|View Session>"
+                ),
+            },
+        },
+        {
+            "type": "context",
+            "elements": [{"type": "mrkdwn", "text": (
+                "No action needed — Devin is re-analyzing the failing checks "
+                "and will push a fix to the same PR."
+            )}],
+        },
+    ]
+
+    return send_to(config, "security", blocks)
+
+
+def notify_alert_resolved(
+    config: Config,
+    session: DevinSession,
+    batch_description: str,
+) -> bool:
+    """
+    #security — A vulnerability has been verified fixed (PR passed CodeQL).
+    Closes the loop for the security team — they see risk being eliminated.
+    """
+    pr_num = session.pr_url.rstrip("/").split("/")[-1] if session.pr_url else "?"
+    alert_count = len(session.alert_numbers)
+    retries = session.retry_count
+
+    retry_note = ""
+    if retries > 0:
+        retry_note = f" after {retries} retry(s)"
+
+    blocks = [
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": f"Resolved: {batch_description}"},
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f":white_check_mark: *{alert_count} alert(s) remediated{retry_note}*\n\n"
+                    f"PR <{session.pr_url}|#{pr_num}> passed all CodeQL checks "
+                    f"and is awaiting engineer merge.\n"
+                    f"*Alerts:* {', '.join(f'#{n}' for n in session.alert_numbers)}"
                 ),
             },
         },
@@ -228,7 +273,12 @@ def notify_retry_sent(
     return send_to(config, "security", blocks)
 
 
-# --- #engineering channel ---
+# ---------------------------------------------------------------------------
+# #engineering channel — "Action Inbox"
+#
+# Engineers only get pinged when a human needs to act.
+# Confidence scoring helps them prioritize which PRs to review first.
+# ---------------------------------------------------------------------------
 
 def notify_pr_ready(
     config: Config, session: DevinSession, batch_description: str
@@ -236,11 +286,23 @@ def notify_pr_ready(
     """
     #engineering — A specific PR is ready for code review.
     One message per PR. Tells the engineer exactly what was fixed and where.
+    Includes confidence score based on retry count to help prioritize review.
     """
     if not session.pr_url:
         return False
 
     pr_num = session.pr_url.rstrip("/").split("/")[-1]
+
+    confidence = session.confidence
+    if confidence == "low":
+        conf_emoji = ":red_circle:"
+        conf_text = "LOW — multiple retries, review carefully"
+    elif confidence == "medium":
+        conf_emoji = ":large_yellow_circle:"
+        conf_text = "MEDIUM — required 1 retry"
+    else:
+        conf_emoji = ":large_green_circle:"
+        conf_text = "HIGH — passed all checks first try"
 
     blocks = [
         {
@@ -252,8 +314,10 @@ def notify_pr_ready(
             "text": {
                 "type": "mrkdwn",
                 "text": (
+                    f"{conf_emoji} *Confidence: {conf_text}*\n\n"
                     f"*What was fixed:* {batch_description}\n"
                     f"*Alerts resolved:* {', '.join(f'#{n}' for n in session.alert_numbers)}\n"
+                    f"*Retries:* {session.retry_count}\n"
                     f"*PR:* <{session.pr_url}|View PR #{pr_num}>"
                 ),
             },
@@ -279,7 +343,9 @@ def notify_pr_ready(
     return send_to(config, "engineering", blocks)
 
 
-# --- #all channel (management) ---
+# ---------------------------------------------------------------------------
+# #all channel (management)
+# ---------------------------------------------------------------------------
 
 def notify_weekly_digest(
     config: Config,

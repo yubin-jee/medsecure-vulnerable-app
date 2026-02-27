@@ -96,6 +96,18 @@ def enrich_sessions(session_dicts, state):
         session["category"] = info.get("category", "")
         session["file_path"] = info.get("file_path", "")
 
+        # Confidence score based on retry count
+        retries = session.get("retry_count", 0)
+        if retries == 0:
+            session["confidence"] = "high"
+            session["confidence_order"] = 2
+        elif retries == 1:
+            session["confidence"] = "medium"
+            session["confidence_order"] = 1
+        else:
+            session["confidence"] = "low"
+            session["confidence_order"] = 0
+
     return session_dicts
 
 

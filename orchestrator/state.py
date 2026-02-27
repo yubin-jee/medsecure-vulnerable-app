@@ -93,6 +93,7 @@ def get_sessions_from_state(state: dict) -> list[DevinSession]:
                 created_at=s.get("created_at", ""),
                 updated_at=s.get("updated_at", ""),
                 error=s.get("error"),
+                retry_count=s.get("retry_count", 0),
             )
         )
     return sessions

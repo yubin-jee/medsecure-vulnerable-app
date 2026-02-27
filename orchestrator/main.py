@@ -29,6 +29,7 @@ from notify import (
     notify_session_failed,
     notify_needs_human_review,
     notify_retry_sent,
+    notify_alert_resolved,
 )
 from checks import check_and_retry_sessions
 from state import (
@@ -188,8 +189,10 @@ def run_pipeline(config: Config, notify: bool = True) -> dict:
                 batch_desc = info.get("description", "Security fix")
 
             # #engineering — PR ready for code review
+            # #security — alert resolved (closes the loop)
             if session.status in ("finished", "review_ready") and session.pr_url:
                 notify_pr_ready(config, session, batch_desc)
+                notify_alert_resolved(config, session, batch_desc)
                 notified_sessions.add(session.session_id)
 
             # #security — Devin couldn't fix, needs manual remediation
@@ -253,15 +256,25 @@ def run_pipeline(config: Config, notify: bool = True) -> dict:
     }
 
 
-def run_continuous(config: Config):
-    """Run the pipeline in a continuous loop."""
+def run_continuous(config: Config, max_cycles: int = 0, cycle_delay: int = 180):
+    """Run the pipeline in a continuous loop.
+
+    Args:
+        config: Pipeline configuration.
+        max_cycles: Stop after this many cycles. 0 = run forever.
+        cycle_delay: Seconds to wait between cycles.
+    """
     logger.info(
         f"Starting SecureFlow in continuous mode. "
-        f"Polling every {config.poll_interval}s..."
+        f"Polling every {cycle_delay}s"
+        + (f", max {max_cycles} cycles." if max_cycles else "...")
     )
 
+    cycle = 0
     while True:
+        cycle += 1
         try:
+            logger.info(f"--- Cycle {cycle}{f'/{max_cycles}' if max_cycles else ''} ---")
             run_pipeline(config)
         except KeyboardInterrupt:
             logger.info("Shutting down SecureFlow.")
@@ -269,8 +282,12 @@ def run_continuous(config: Config):
         except Exception as e:
             logger.error(f"Pipeline error: {e}", exc_info=True)
 
-        logger.info(f"Next run in {config.poll_interval}s...")
-        time.sleep(config.poll_interval)
+        if max_cycles and cycle >= max_cycles:
+            logger.info(f"Reached max cycles ({max_cycles}). Exiting.")
+            break
+
+        logger.info(f"Next run in {cycle_delay}s...")
+        time.sleep(cycle_delay)
 
 
 def main():
@@ -285,6 +302,18 @@ def main():
         "--no-notify",
         action="store_true",
         help="Skip Slack notifications",
+    )
+    parser.add_argument(
+        "--max-cycles",
+        type=int,
+        default=0,
+        help="In continuous mode, stop after N cycles (0 = run forever)",
+    )
+    parser.add_argument(
+        "--cycle-delay",
+        type=int,
+        default=180,
+        help="Seconds to wait between cycles in continuous mode (default: 180)",
     )
     args = parser.parse_args()
 
@@ -314,7 +343,7 @@ def main():
         return
 
     if args.mode == "continuous":
-        run_continuous(config)
+        run_continuous(config, max_cycles=args.max_cycles, cycle_delay=args.cycle_delay)
     else:
         run_pipeline(config, notify=not args.no_notify)
 

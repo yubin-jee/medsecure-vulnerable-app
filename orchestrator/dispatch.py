@@ -31,6 +31,7 @@ class DevinSession:
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     error: str | None = None
+    retry_count: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -43,7 +44,17 @@ class DevinSession:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "error": self.error,
+            "retry_count": self.retry_count,
         }
+
+    @property
+    def confidence(self) -> str:
+        """Confidence score based on retry count: high/medium/low."""
+        if self.retry_count == 0:
+            return "high"
+        elif self.retry_count == 1:
+            return "medium"
+        return "low"
 
 
 def build_prompt(batch: AlertBatch) -> str:

@@ -26,7 +26,10 @@
       "WebFetch(domain:digitalguardian.com)",
       "WebFetch(domain:www.strongdm.com)",
       "Bash(python3:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(gh pr list:*)",
+      "Bash(/opt/homebrew/bin/gh version)",
+      "Bash(/usr/local/bin/gh version)"
     ]
   }
 }

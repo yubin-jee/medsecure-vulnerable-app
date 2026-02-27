@@ -194,6 +194,7 @@ def check_and_retry_sessions(
             try:
                 send_message(config, session.session_id, retry_prompt)
                 session.status = "running"
+                session.retry_count += 1
                 actions.append({
                     "action": "retry",
                     "session_id": session.session_id,

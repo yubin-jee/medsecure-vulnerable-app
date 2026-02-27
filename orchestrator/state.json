@@ -1,1 +1,435 @@
-{}
+{
+  "sessions": [
+    {
+      "session_id": "devin-d39c8f82f2d44a4c8f5d29e3e75b21f9",
+      "batch_id": "batch-012",
+      "alert_numbers": [
+        21,
+        20,
+        19
+      ],
+      "status": "review_ready",
+      "url": "https://app.devin.ai/sessions/d39c8f82f2d44a4c8f5d29e3e75b21f9",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/105",
+      "created_at": "2026-02-27T05:53:56.068896",
+      "updated_at": "2026-02-27T06:00:53.688075Z",
+      "error": null,
+      "retry_count": 1
+    },
+    {
+      "session_id": "devin-0dd583e06dec476cb00bf54666b4c425",
+      "batch_id": "batch-003",
+      "alert_numbers": [
+        39
+      ],
+      "status": "review_ready",
+      "url": "https://app.devin.ai/sessions/0dd583e06dec476cb00bf54666b4c425",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/104",
+      "created_at": "2026-02-27T05:54:00.956474",
+      "updated_at": "2026-02-27T06:00:13.417844Z",
+      "error": null,
+      "retry_count": 1
+    },
+    {
+      "session_id": "devin-a95b6717e7474449bf1850ecabcaa14e",
+      "batch_id": "batch-002",
+      "alert_numbers": [
+        40
+      ],
+      "status": "merged",
+      "url": "https://app.devin.ai/sessions/a95b6717e7474449bf1850ecabcaa14e",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/102",
+      "created_at": "2026-02-27T05:54:01.437540",
+      "updated_at": "2026-02-27T05:56:55.916101Z",
+      "error": null,
+      "retry_count": 0
+    },
+    {
+      "session_id": "devin-d311606dbbab4964aaf4f2774cde46e4",
+      "batch_id": "batch-007",
+      "alert_numbers": [
+        35,
+        34
+      ],
+      "status": "review_ready",
+      "url": "https://app.devin.ai/sessions/d311606dbbab4964aaf4f2774cde46e4",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/103",
+      "created_at": "2026-02-27T05:54:01.924279",
+      "updated_at": "2026-02-27T06:02:46.012376Z",
+      "error": null,
+      "retry_count": 2
+    },
+    {
+      "session_id": "devin-29f06017345846bd9b427ca41b6fb934",
+      "batch_id": "batch-008",
+      "alert_numbers": [
+        33,
+        32,
+        31,
+        30,
+        29,
+        27
+      ],
+      "status": "review_ready",
+      "url": "https://app.devin.ai/sessions/29f06017345846bd9b427ca41b6fb934",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/106",
+      "created_at": "2026-02-27T05:54:02.427137",
+      "updated_at": "2026-02-27T05:55:49.771067Z",
+      "error": null,
+      "retry_count": 1
+    },
+    {
+      "session_id": "devin-1ba2bdb79450413f89acfc3c50fc5b41",
+      "batch_id": "batch-003",
+      "alert_numbers": [
+        37
+      ],
+      "status": "merged",
+      "url": "https://app.devin.ai/sessions/1ba2bdb79450413f89acfc3c50fc5b41",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/107",
+      "created_at": "2026-02-27T06:27:51.597136",
+      "updated_at": "2026-02-27T06:29:37.116703Z",
+      "error": null,
+      "retry_count": 0
+    },
+    {
+      "session_id": "devin-bd71063524fe434ea34b72f7647b7e80",
+      "batch_id": "batch-004",
+      "alert_numbers": [
+        28,
+        26,
+        25
+      ],
+      "status": "review_ready",
+      "url": "https://app.devin.ai/sessions/bd71063524fe434ea34b72f7647b7e80",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/108",
+      "created_at": "2026-02-27T06:30:53.521227",
+      "updated_at": "2026-02-27T06:30:53.521245",
+      "error": null,
+      "retry_count": 1
+    },
+    {
+      "session_id": "devin-3471925aa67e42e98504c2adbb64c6f6",
+      "batch_id": "batch-005",
+      "alert_numbers": [
+        23,
+        22
+      ],
+      "status": "running",
+      "url": "https://app.devin.ai/sessions/3471925aa67e42e98504c2adbb64c6f6",
+      "pr_url": null,
+      "created_at": "2026-02-27T06:33:57.954392",
+      "updated_at": "2026-02-27T06:33:57.954403",
+      "error": null,
+      "retry_count": 0
+    },
+    {
+      "session_id": "devin-43a8c4329f464df0913f0617a847b5dd",
+      "batch_id": "batch-007",
+      "alert_numbers": [
+        17
+      ],
+      "status": "review_ready",
+      "url": "https://app.devin.ai/sessions/43a8c4329f464df0913f0617a847b5dd",
+      "pr_url": "https://github.com/yubin-jee/medsecure-vulnerable-app/pull/109",
+      "created_at": "2026-02-27T06:33:58.484016",
+      "updated_at": "2026-02-27T06:33:58.484031",
+      "error": null,
+      "retry_count": 0
+    },
+    {
+      "session_id": "devin-877c7c66cab84328a1c66d4825ccc735",
+      "batch_id": "batch-008",
+      "alert_numbers": [
+        16,
+        15,
+        14,
+        11,
+        10
+      ],
+      "status": "running",
+      "url": "https://app.devin.ai/sessions/877c7c66cab84328a1c66d4825ccc735",
+      "pr_url": null,
+      "created_at": "2026-02-27T06:33:59.040393",
+      "updated_at": "2026-02-27T06:33:59.040403",
+      "error": null,
+      "retry_count": 0
+    }
+  ],
+  "processed_alerts": [
+    21,
+    20,
+    19,
+    39,
+    40,
+    35,
+    34,
+    33,
+    32,
+    31,
+    30,
+    29,
+    27,
+    37,
+    28,
+    26,
+    25,
+    23,
+    22,
+    17,
+    16,
+    15,
+    14,
+    11,
+    10
+  ],
+  "notified_sessions": [
+    "devin-a95b6717e7474449bf1850ecabcaa14e",
+    "devin-d39c8f82f2d44a4c8f5d29e3e75b21f9",
+    "devin-29f06017345846bd9b427ca41b6fb934",
+    "devin-43a8c4329f464df0913f0617a847b5dd",
+    "devin-bd71063524fe434ea34b72f7647b7e80",
+    "devin-0dd583e06dec476cb00bf54666b4c425",
+    "devin-1ba2bdb79450413f89acfc3c50fc5b41",
+    "devin-d311606dbbab4964aaf4f2774cde46e4"
+  ],
+  "history": [
+    {
+      "timestamp": "2026-02-27T05:54:04.179414",
+      "total_open": 41,
+      "fixed": 0,
+      "in_progress": 4
+    },
+    {
+      "timestamp": "2026-02-27T05:57:26.164259",
+      "total_open": 41,
+      "fixed": 1,
+      "in_progress": 4
+    },
+    {
+      "timestamp": "2026-02-27T06:00:36.378842",
+      "total_open": 41,
+      "fixed": 8,
+      "in_progress": 2
+    },
+    {
+      "timestamp": "2026-02-27T06:03:42.287029",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:06:43.393385",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:09:44.591783",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:12:45.826199",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:15:46.910242",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:18:48.116710",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:21:49.176542",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:24:50.446714",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:27:52.280268",
+      "total_open": 41,
+      "fixed": 13,
+      "in_progress": 0
+    },
+    {
+      "timestamp": "2026-02-27T06:30:56.529139",
+      "total_open": 41,
+      "fixed": 14,
+      "in_progress": 1
+    },
+    {
+      "timestamp": "2026-02-27T06:34:03.226354",
+      "total_open": 41,
+      "fixed": 14,
+      "in_progress": 4
+    },
+    {
+      "timestamp": "2026-02-27T06:37:09.595348",
+      "total_open": 40,
+      "fixed": 18,
+      "in_progress": 2
+    }
+  ],
+  "last_run": "2026-02-27T06:37:09.595361",
+  "batch_info": {
+    "batch-012": {
+      "description": "js/missing-rate-limiting in src/routes/admin.js:19 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-003": {
+      "description": "js/clear-text-cookie in src/app.js:19 \u2014 Sensitive cookie sent without enforcing SSL encryption.",
+      "severity": "medium",
+      "category": "js/clear-text-cookie",
+      "file_path": "src/app.js",
+      "alert_count": 1
+    },
+    "batch-002": {
+      "description": "js/sensitive-get-query in src/routes/patients.js:15 \u2014 Route handler for GET requests uses query parameter as sensitive data.",
+      "severity": "medium",
+      "category": "js/sensitive-get-query",
+      "file_path": "src/routes/patients.js",
+      "alert_count": 1
+    },
+    "batch-007": {
+      "description": "4 js/missing-rate-limiting issues in src/routes/auth.js at lines 13, 38, 49, 55",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/auth.js",
+      "alert_count": 4
+    },
+    "batch-008": {
+      "description": "js/missing-rate-limiting in src/routes/api.js:7 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-005": {
+      "description": "js/server-side-unvalidated-url-redirection in src/routes/admin.js:41 \u2014 Untrusted URL redirection depends on a user-provided value.",
+      "severity": "medium",
+      "category": "js/server-side-unvalidated-url-redirection",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-009": {
+      "description": "js/missing-rate-limiting in src/routes/admin.js:19 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-010": {
+      "description": "4 js/missing-rate-limiting issues in src/routes/auth.js at lines 13, 38, 49, 55",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/auth.js",
+      "alert_count": 4
+    },
+    "batch-011": {
+      "description": "js/missing-rate-limiting in src/routes/api.js:7 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-014": {
+      "description": "js/missing-rate-limiting in src/routes/admin.js:19 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-015": {
+      "description": "5 js/missing-rate-limiting issues in src/routes/reports.js at lines 8, 15, 26, 33, 40",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/reports.js",
+      "alert_count": 5
+    },
+    "batch-016": {
+      "description": "5 js/missing-rate-limiting issues in src/routes/patients.js at lines 6, 14, 25, 33, 42",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/patients.js",
+      "alert_count": 5
+    },
+    "batch-017": {
+      "description": "4 js/missing-rate-limiting issues in src/routes/auth.js at lines 13, 38, 49, 55",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/auth.js",
+      "alert_count": 4
+    },
+    "batch-018": {
+      "description": "js/missing-rate-limiting in src/routes/api.js:7 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-019": {
+      "description": "js/missing-rate-limiting in src/routes/admin.js:19 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    },
+    "batch-001": {
+      "description": "js/log-injection in src/routes/api.js:31 \u2014 Log entry depends on a user-provided value.",
+      "severity": "medium",
+      "category": "js/log-injection",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-004": {
+      "description": "js/sql-injection in src/routes/api.js:16 \u2014 This query string depends on a user-provided value.\nThis query string depends on a user-provided val",
+      "severity": "high",
+      "category": "SQL Injection",
+      "file_path": "src/routes/api.js",
+      "alert_count": 1
+    },
+    "batch-006": {
+      "description": "5 js/missing-rate-limiting issues in src/routes/patients.js at lines 6, 14, 25, 33, 42",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/patients.js",
+      "alert_count": 5
+    },
+    "batch-013": {
+      "description": "js/missing-rate-limiting in src/routes/admin.js:19 \u2014 This route handler performs a database access, but is not rate-limited.",
+      "severity": "high",
+      "category": "js/missing-rate-limiting",
+      "file_path": "src/routes/admin.js",
+      "alert_count": 1
+    }
+  },
+  "verified_sessions": [
+    "devin-a95b6717e7474449bf1850ecabcaa14e",
+    "devin-d39c8f82f2d44a4c8f5d29e3e75b21f9",
+    "devin-29f06017345846bd9b427ca41b6fb934",
+    "devin-43a8c4329f464df0913f0617a847b5dd",
+    "devin-bd71063524fe434ea34b72f7647b7e80",
+    "devin-0dd583e06dec476cb00bf54666b4c425",
+    "devin-1ba2bdb79450413f89acfc3c50fc5b41",
+    "devin-d311606dbbab4964aaf4f2774cde46e4"
+  ],
+  "initial_scan_sent": true
+}

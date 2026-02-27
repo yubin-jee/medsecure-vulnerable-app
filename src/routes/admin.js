@@ -51,22 +51,14 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// Secure: Reject dangerous property names to prevent prototype pollution (CWE-1321)
-const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
-function isSafePropertyName(key) {
-  return typeof key === 'string' && !FORBIDDEN_KEYS.has(key);
-}
-
+// Secure: Use a Map to avoid remote property injection / prototype pollution (CWE-1321)
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = Object.create(null);
+  const settings = new Map();
   Object.keys(userSettings).forEach(key => {
-    if (isSafePropertyName(key)) {
-      settings[key] = userSettings[key];
-    }
+    settings.set(key, userSettings[key]);
   });
-  res.json({ settings });
+  res.json({ settings: Object.fromEntries(settings) });
 });
 
 module.exports = router;

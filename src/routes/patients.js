@@ -1,11 +1,25 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const db = require('../utils/database');
+
+// Rate limiter for patient routes: max 100 requests per 15 minutes per IP
+const patientRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+// Apply rate limiting to all patient routes
+router.use(patientRateLimiter);
 
 // Allowed columns for patient updates (whitelist to prevent SQL injection via column names)
 const ALLOWED_PATIENT_COLUMNS = ['name', 'dob', 'ssn', 'diagnosis'];
 
 // FIXED: SQL Injection - use parameterized query with ? placeholder
+// Rate limited via router-level middleware above
 router.get('/search', (req, res) => {
   const name = req.query.name;
   const query = "SELECT * FROM patients WHERE name LIKE ?";

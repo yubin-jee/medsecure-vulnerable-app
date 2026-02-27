@@ -51,12 +51,20 @@ router.post('/import-config', (req, res) => {
   });
 });
 
-// VULN: Prototype pollution via merge (CWE-1321)
+// Secure: Reject dangerous property names to prevent prototype pollution (CWE-1321)
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafePropertyName(key) {
+  return typeof key === 'string' && !FORBIDDEN_KEYS.has(key);
+}
+
 router.post('/update-settings', (req, res) => {
   const userSettings = req.body;
-  const settings = {};
+  const settings = Object.create(null);
   Object.keys(userSettings).forEach(key => {
-    settings[key] = userSettings[key];
+    if (isSafePropertyName(key)) {
+      settings[key] = userSettings[key];
+    }
   });
   res.json({ settings });
 });

@@ -22,17 +22,32 @@ router.post('/export', (req, res) => {
   });
 });
 
-// VULN: Path traversal (CWE-22) - user controls file path
+// FIX: Path traversal (CWE-22) - validate resolved path stays within root
 router.get('/download', (req, res) => {
   const filename = req.query.file;
-  const filePath = path.join('/reports', filename);
+  if (!filename) {
+    return res.status(400).json({ error: 'Missing file parameter' });
+  }
+  const ROOT_DIR = '/reports';
+  const filePath = path.resolve(ROOT_DIR, filename);
+  if (!filePath.startsWith(ROOT_DIR + path.sep) && filePath !== ROOT_DIR) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
   res.sendFile(filePath);
 });
 
-// VULN: Path traversal (CWE-22) - reading arbitrary files
+// FIX: Path traversal (CWE-22) - validate resolved path stays within root
 router.get('/view', (req, res) => {
   const reportPath = req.query.path;
-  const content = fs.readFileSync(reportPath, 'utf-8');
+  if (!reportPath) {
+    return res.status(400).json({ error: 'Missing path parameter' });
+  }
+  const ROOT_DIR = '/reports';
+  const resolvedPath = path.resolve(ROOT_DIR, reportPath);
+  if (!resolvedPath.startsWith(ROOT_DIR + path.sep) && resolvedPath !== ROOT_DIR) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  const content = fs.readFileSync(resolvedPath, 'utf-8');
   res.json({ content });
 });
 

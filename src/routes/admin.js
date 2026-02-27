@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../utils/database');
+const escapeHtml = require('escape-html');
 
 // VULN: Reflected XSS (CWE-79) - user input rendered without escaping
 router.get('/search-users', (req, res) => {
@@ -8,7 +9,7 @@ router.get('/search-users', (req, res) => {
   res.send(`
     <html>
       <body>
-        <h1>Search Results for: ${query}</h1>
+        <h1>Search Results for: ${escapeHtml(query || '')}</h1>
         <div id="results"></div>
       </body>
     </html>
@@ -30,7 +31,7 @@ router.get('/announcements', (req, res) => {
 router.get('/settings', (req, res) => {
   const section = req.query.section;
   if (!['general', 'security', 'notifications'].includes(section)) {
-    return res.send(`<html><body><h1>Error</h1><p>Invalid section: ${section}</p></body></html>`);
+    return res.send(`<html><body><h1>Error</h1><p>Invalid section: ${escapeHtml(section || '')}</p></body></html>`);
   }
   res.send(`<html><body><h1>Settings: ${section}</h1></body></html>`);
 });

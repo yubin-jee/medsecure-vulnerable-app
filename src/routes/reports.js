@@ -1,20 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const { execSync, exec } = require('child_process');
+const { execFileSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 // VULN: Command injection (CWE-78) - user input in shell command
 router.get('/generate', (req, res) => {
   const reportType = req.query.type;
-  const output = execSync('generate-report --type ' + reportType + ' --format pdf');
+  const output = execFileSync('generate-report', ['--type', reportType, '--format', 'pdf']);
   res.send(output);
 });
 
 // VULN: Command injection (CWE-78) - template literal in exec
 router.post('/export', (req, res) => {
   const { filename, format } = req.body;
-  exec(`convert-data "${filename}" --output-format ${format}`, (err, stdout) => {
+  execFile('convert-data', [filename, '--output-format', format], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -39,8 +39,7 @@ router.get('/view', (req, res) => {
 // VULN: Command injection via filename (CWE-78)
 router.post('/compress', (req, res) => {
   const { files } = req.body;
-  const fileList = files.join(' ');
-  execSync(`tar -czf /tmp/archive.tar.gz ${fileList}`);
+  execFileSync('tar', ['-czf', '/tmp/archive.tar.gz', ...files]);
   res.download('/tmp/archive.tar.gz');
 });
 

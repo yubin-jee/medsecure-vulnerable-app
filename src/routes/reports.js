@@ -44,43 +44,36 @@ router.post('/compress', (req, res) => {
   res.download('/tmp/archive.tar.gz');
 });
 
-// FIX: Server-Side Request Forgery (CWE-918) - validate URL against allowed hostnames
+// FIX: Server-Side Request Forgery (CWE-918) - use resource-key lookup instead of user-provided URLs
 const http = require('http');
 const https = require('https');
-const { URL } = require('url');
 
-const ALLOWED_EXTERNAL_HOSTS = [
-  'api.example.com',
-  'data.example.com',
-  'reports.example.com',
-];
+// Map of allowed resource keys to their server-controlled URLs.
+// User input selects a key; it never flows into the request URL.
+const ALLOWED_RESOURCES = {
+  'api':     'https://api.example.com/data',
+  'reports': 'https://reports.example.com/data',
+  'data':    'https://data.example.com/data',
+};
 
 router.get('/fetch-external', (req, res) => {
-  const rawUrl = req.query.url;
+  const resourceKey = req.query.resource;
 
-  if (!rawUrl) {
-    return res.status(400).json({ error: 'Missing url parameter' });
+  if (!resourceKey) {
+    return res.status(400).json({ error: 'Missing resource parameter' });
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(rawUrl);
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid URL' });
+  const targetUrl = ALLOWED_RESOURCES[resourceKey];
+
+  if (!targetUrl) {
+    return res.status(403).json({
+      error: 'Unknown resource. Allowed values: ' + Object.keys(ALLOWED_RESOURCES).join(', ')
+    });
   }
 
-  // Only allow http and https protocols
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http and https protocols are allowed' });
-  }
-
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
-    return res.status(403).json({ error: 'Hostname not allowed' });
-  }
-
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl, (response) => {
+  // targetUrl is entirely server-defined; no user input reaches the request URL
+  const client = targetUrl.startsWith('https') ? https : http;
+  client.get(targetUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));

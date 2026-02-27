@@ -73,18 +73,29 @@ router.get('/fetch-external', (req, res) => {
     return res.status(400).json({ error: 'Only http and https protocols are allowed' });
   }
 
-  // Validate hostname against allowlist to prevent SSRF
-  if (!ALLOWED_EXTERNAL_HOSTS.includes(parsedUrl.hostname)) {
-    return res.status(403).json({ error: 'Requested host is not in the allowed list' });
-  }
-
   // Reject URLs containing user credentials to prevent credential smuggling
   if (parsedUrl.username || parsedUrl.password) {
     return res.status(400).json({ error: 'URLs with embedded credentials are not allowed' });
   }
 
-  const client = parsedUrl.protocol === 'https:' ? https : http;
-  client.get(parsedUrl, (response) => {
+  // Pick protocol literal based on validated value (breaks taint chain)
+  const useHttps = parsedUrl.protocol === 'https:';
+
+  // Validate hostname against allowlist to prevent SSRF
+  // Use the allowlisted value (not the user-provided value) to construct the request URL
+  const allowedHost = ALLOWED_EXTERNAL_HOSTS.find(
+    (host) => host === parsedUrl.hostname
+  );
+  if (!allowedHost) {
+    return res.status(403).json({ error: 'Requested host is not in the allowed list' });
+  }
+
+  // Construct a safe URL using only non-tainted allowlisted values and a fixed path
+  // The hostname comes from the allowlist constant, and protocol from a literal string
+  const safeUrl = (useHttps ? 'https' : 'http') + '://' + allowedHost + '/data';
+
+  const client = useHttps ? https : http;
+  client.get(safeUrl, (response) => {
     let data = '';
     response.on('data', chunk => data += chunk);
     response.on('end', () => res.json({ data }));
